@@ -586,6 +586,7 @@
         <input type="range" id="speed-slider" min="1" max="10" value="5" />
         <span class="speed-label" id="speed-val">5×</span>
       </div>
+      <button class="ctrl-btn" id="btn-mute" title="Toggle sound" style="margin-left:6px;font-size:16px;">🔊</button>
     </div>
   </div>
 
@@ -2083,6 +2084,149 @@ function renderSim() {
 }
 
 // ═══════════════════════════════════════════════════════
+//  SOUND ENGINE  (Web Audio API — no external files)
+// ═══════════════════════════════════════════════════════
+
+let _ac = null;
+let _sfxMuted = false;
+
+function getAC() {
+  if (!_ac) _ac = new (window.AudioContext || window.webkitAudioContext)();
+  if (_ac.state === 'suspended') _ac.resume();
+  return _ac;
+}
+
+/* ── tiny helper to build osc + gain → destination ── */
+function _osc(type, freq, gainVal, startT, endT, freqEnd) {
+  const ac   = getAC();
+  const osc  = ac.createOscillator();
+  const gain = ac.createGain();
+  osc.connect(gain); gain.connect(ac.destination);
+  osc.type = type;
+  osc.frequency.setValueAtTime(freq, startT);
+  if (freqEnd !== undefined) osc.frequency.exponentialRampToValueAtTime(freqEnd, endT);
+  gain.gain.setValueAtTime(gainVal, startT);
+  gain.gain.exponentialRampToValueAtTime(0.0001, endT);
+  osc.start(startT); osc.stop(endT + 0.01);
+}
+
+/* ── white noise burst ── */
+function _noise(gainVal, cutoff, startT, dur) {
+  const ac  = getAC();
+  const len = Math.ceil(ac.sampleRate * dur);
+  const buf = ac.createBuffer(1, len, ac.sampleRate);
+  const d   = buf.getChannelData(0);
+  for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+  const src    = ac.createBufferSource();
+  src.buffer   = buf;
+  const filt   = ac.createBiquadFilter();
+  filt.type    = 'lowpass';
+  filt.frequency.value = cutoff;
+  const gain   = ac.createGain();
+  src.connect(filt); filt.connect(gain); gain.connect(ac.destination);
+  gain.gain.setValueAtTime(gainVal, startT);
+  gain.gain.exponentialRampToValueAtTime(0.0001, startT + dur);
+  src.start(startT); src.stop(startT + dur);
+}
+
+/* ════════ Individual sound effects ════════ */
+
+function sfxShoot() {
+  if (_sfxMuted) return;
+  const t = getAC().currentTime;
+  _osc('sawtooth', 900, 0.25, t,      t+0.12, 180);  // descending pew
+  _osc('square',   600, 0.08, t,      t+0.06, 200);  // bite
+  _noise(0.12, 1200, t, 0.1);                         // air hiss
+}
+
+function sfxLoad() {
+  if (_sfxMuted) return;
+  const t = getAC().currentTime;
+  _osc('sine',   260, 0.18, t,      t+0.05, 520);   // rising click
+  _osc('square', 180, 0.10, t+0.04, t+0.09, 360);   // clunk
+}
+
+function sfxMove() {
+  if (_sfxMuted) return;
+  const t = getAC().currentTime;
+  _osc('sine', 90, 0.12, t, t+0.08, 45);            // soft thud
+  _noise(0.05, 300, t, 0.07);
+}
+
+function sfxRotate() {
+  if (_sfxMuted) return;
+  const t = getAC().currentTime;
+  _osc('sine', 400, 0.08, t, t+0.06, 320);          // short swish
+}
+
+function sfxBlocked() {
+  if (_sfxMuted) return;
+  const t = getAC().currentTime;
+  _osc('square', 160, 0.10, t, t+0.07, 130);        // dull thud
+}
+
+function sfxBurst() {
+  if (_sfxMuted) return;
+  const t = getAC().currentTime;
+  // Big low boom
+  _osc('sine',     140, 0.55, t,      t+0.55, 25);
+  // Mid crunch
+  _osc('sawtooth', 300, 0.25, t,      t+0.30, 60);
+  // High splat
+  _osc('square',   700, 0.15, t,      t+0.12, 150);
+  // Noise splatter
+  _noise(0.55, 800,  t,        0.45);
+  _noise(0.30, 2400, t+0.02,   0.25);
+}
+
+function sfxSimStart() {
+  if (_sfxMuted) return;
+  const ac  = getAC();
+  const t   = ac.currentTime;
+  const notes = [261, 329, 392, 523]; // C4 E4 G4 C5
+  notes.forEach((f, i) => _osc('sine', f, 0.18, t + i*0.07, t + i*0.07 + 0.18, f));
+}
+
+function sfxGameOver(winIdx) {
+  if (_sfxMuted) return;
+  const ac = getAC();
+  const t  = ac.currentTime;
+  if (winIdx >= 0) {
+    // Victory fanfare — ascending arpeggio + held chord
+    [392, 494, 587, 784].forEach((f, i) =>
+      _osc('triangle', f, 0.22, t + i*0.09, t + i*0.09 + 0.35, f)
+    );
+  } else {
+    // Draw — neutral resolved chord
+    [261, 329, 392].forEach((f, i) =>
+      _osc('sine', f, 0.16, t + i*0.05, t + 0.5, f)
+    );
+  }
+}
+
+/* ════════ Play all sounds for a given turn state ════════ */
+function playSoundsForState(state) {
+  if (_sfxMuted || !state) return;
+  const evts   = state.events || [];
+  const shots  = state.shots  || [];
+
+  const hasBurst  = shots.some(s => s.isBurst);
+  const hasShoot  = shots.some(s => !s.isBurst);
+  const hasLoad   = evts.some(e => e.text && e.text.includes('Loaded'));
+  const hasMove   = evts.some(e => e.text && e.text.startsWith('Moved'));
+  const hasRotate = evts.some(e => e.text && (e.text.includes('Rotated left') || e.text.includes('Rotated right')));
+  const hasBlock  = evts.some(e => e.text && e.text.includes('blocked'));
+
+  // Priority order: burst > shoot > load/move/rotate
+  if (hasBurst)  { sfxBurst();   return; }
+  if (hasShoot)   sfxShoot();
+  if (hasLoad)    sfxLoad();
+  if (hasMove)    sfxMove();
+  if (hasRotate)  sfxRotate();
+  if (hasBlock)   sfxBlocked();
+}
+
+// ═══════════════════════════════════════════════════════
 //  PLAYBACK
 // ═══════════════════════════════════════════════════════
 
@@ -2101,8 +2245,23 @@ function pause() {
   document.getElementById('btn-play').classList.remove('accent');
 }
 function tick() {
-  if (app.currentTurn >= app.numTurns) { pause(); return; }
+  if (app.currentTurn >= app.numTurns) {
+    pause();
+    // Play game-over sound based on winner
+    const state = app.states[app.numTurns];
+    if (state) {
+      const gs = app.gridSize;
+      const counts = [0,1,2,3].map(i =>
+        state.grid.flat().filter(c => c===i).length
+      );
+      const max = Math.max(...counts);
+      const winners = counts.filter(c=>c===max);
+      sfxGameOver(winners.length === 1 ? counts.indexOf(max) : -1);
+    }
+    return;
+  }
   app.currentTurn++;
+  playSoundsForState(app.states[app.currentTurn]);
   renderSim();
   app.playTimer = setTimeout(tick, playMs());
 }
@@ -2169,28 +2328,35 @@ document.addEventListener('DOMContentLoaded', () => {
     app.states  = runSimulation(app.gridSize, app.numTurns, app.programs, app.terrain);
     app.currentTurn = 0;
     switchTab('simulation');
+    sfxSimStart();
     setTimeout(() => { sizeCanvas(); renderSim(); }, 120);
   });
 
   // Playback controls
   document.getElementById('btn-first').addEventListener('click', () => { pause(); app.currentTurn=0; renderSim(); });
-  document.getElementById('btn-prev').addEventListener('click',  () => { pause(); if(app.currentTurn>0){ app.currentTurn--; renderSim(); } });
+  document.getElementById('btn-prev').addEventListener('click',  () => { pause(); if(app.currentTurn>0){ app.currentTurn--; playSoundsForState(app.states[app.currentTurn]); renderSim(); } });
   document.getElementById('btn-play').addEventListener('click',  () => {
     if (app.playing) pause();
     else { if(app.currentTurn>=app.numTurns) app.currentTurn=0; play(); }
   });
-  document.getElementById('btn-next').addEventListener('click',  () => { pause(); if(app.currentTurn<app.numTurns){ app.currentTurn++; renderSim(); } });
+  document.getElementById('btn-next').addEventListener('click',  () => { pause(); if(app.currentTurn<app.numTurns){ app.currentTurn++; playSoundsForState(app.states[app.currentTurn]); renderSim(); } });
   document.getElementById('btn-last').addEventListener('click',  () => { pause(); app.currentTurn=app.numTurns; renderSim(); });
 
   document.getElementById('speed-slider').addEventListener('input', e => {
     document.getElementById('speed-val').textContent = e.target.value + '×';
   });
 
+  document.getElementById('btn-mute').addEventListener('click', () => {
+    _sfxMuted = !_sfxMuted;
+    document.getElementById('btn-mute').textContent = _sfxMuted ? '🔇' : '🔊';
+    document.getElementById('btn-mute').title = _sfxMuted ? 'Unmute sound' : 'Mute sound';
+  });
+
   // Keyboard shortcuts
   document.addEventListener('keydown', e => {
     if (!document.getElementById('tab-simulation').classList.contains('active')) return;
-    if (e.key==='ArrowLeft')  { pause(); if(app.currentTurn>0){app.currentTurn--;renderSim();} }
-    if (e.key==='ArrowRight') { pause(); if(app.currentTurn<app.numTurns){app.currentTurn++;renderSim();} }
+    if (e.key==='ArrowLeft')  { pause(); if(app.currentTurn>0){app.currentTurn--;playSoundsForState(app.states[app.currentTurn]);renderSim();} }
+    if (e.key==='ArrowRight') { pause(); if(app.currentTurn<app.numTurns){app.currentTurn++;playSoundsForState(app.states[app.currentTurn]);renderSim();} }
     if (e.key===' ')          { e.preventDefault(); app.playing?pause():(app.currentTurn>=app.numTurns?(app.currentTurn=0,play()):play()); }
   });
 
