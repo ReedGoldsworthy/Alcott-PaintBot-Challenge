@@ -1,0 +1,2204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Robot Paint Battle</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --red:    #ef4444;
+      --blue:   #3b82f6;
+      --green:  #22c55e;
+      --yellow: #f59e0b;
+      --bg:     #0f172a;
+      --card:   #1e293b;
+      --border: #334155;
+      --muted:  #475569;
+      --text:   #e2e8f0;
+      --sub:    #94a3b8;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    #app { max-width: 1400px; margin: 0 auto; padding: 20px 24px; }
+
+    /* ─── HEADER ──────────────────────────── */
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 24px;
+      padding-bottom: 20px;
+      border-bottom: 1px solid var(--border);
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    .logo { display: flex; align-items: center; gap: 12px; }
+    .logo-icon {
+      width: 40px; height: 40px;
+      background: linear-gradient(135deg, var(--red), var(--blue));
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 22px;
+    }
+    .logo h1 { font-size: 22px; font-weight: 800; letter-spacing: -0.5px; }
+    .logo span {
+      background: linear-gradient(90deg, var(--red), var(--blue), var(--green), var(--yellow));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    /* ─── NAV TABS ─────────────────────────── */
+    .tab-nav {
+      display: flex; gap: 4px;
+      background: var(--card); padding: 4px; border-radius: 12px;
+    }
+    .tab-btn {
+      padding: 8px 18px; border: none; border-radius: 8px;
+      cursor: pointer; font-size: 13px; font-weight: 600;
+      color: var(--sub); background: transparent; transition: all 0.15s;
+      white-space: nowrap; font-family: inherit;
+    }
+    .tab-btn:hover:not(.active) { color: var(--text); background: #2d3f55; }
+    .tab-btn.active { background: var(--border); color: var(--text); }
+    .tab { display: none; }
+    .tab.active { display: block; }
+
+    /* ─── CARDS ────────────────────────────── */
+    .card {
+      background: var(--card); border-radius: 16px;
+      padding: 24px; border: 1px solid var(--border);
+    }
+    .card-title {
+      font-size: 16px; font-weight: 700; color: var(--text);
+      margin-bottom: 16px; display: flex; align-items: center; gap: 8px;
+    }
+
+    /* ─── SETUP TAB ────────────────────────── */
+    .setup-grid { display: grid; grid-template-columns: 380px 1fr; gap: 20px; align-items: start; }
+    .setup-left { display: flex; flex-direction: column; gap: 16px; }
+    .form-group { margin-bottom: 24px; }
+    .form-group:last-child { margin-bottom: 0; }
+    .form-label { font-size: 13px; color: var(--sub); font-weight: 500; margin-bottom: 6px; display: block; }
+    .form-value { font-size: 28px; font-weight: 800; color: var(--text); margin-bottom: 8px; line-height: 1; }
+    input[type="range"] {
+      -webkit-appearance: none; width: 100%; height: 6px;
+      border-radius: 3px; background: var(--border); outline: none; cursor: pointer;
+    }
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none; width: 18px; height: 18px;
+      border-radius: 50%; background: var(--blue); border: 2px solid white;
+      cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+    }
+    .rules-list { list-style: none; display: flex; flex-direction: column; gap: 10px; }
+    .rules-list li {
+      font-size: 13px; color: var(--sub);
+      display: flex; align-items: flex-start; gap: 10px; line-height: 1.4;
+    }
+    .rules-list li .rule-icon { font-size: 16px; flex-shrink: 0; margin-top: -1px; }
+    .rules-list li strong { color: var(--text); }
+    .btn-primary {
+      display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+      padding: 13px 24px;
+      background: linear-gradient(135deg, #3b82f6, #6366f1);
+      color: white; border: none; border-radius: 12px;
+      font-size: 15px; font-weight: 700; cursor: pointer;
+      transition: transform 0.1s, opacity 0.15s; width: 100%; font-family: inherit;
+    }
+    .btn-primary:hover { opacity: 0.9; transform: translateY(-1px); }
+    .teams-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px; }
+    .team-preview-card { border-radius: 12px; padding: 14px; border: 1px solid transparent; }
+    .team-preview-name { font-size: 15px; font-weight: 700; margin-bottom: 2px; }
+    .team-preview-meta { font-size: 12px; opacity: 0.7; }
+    .preview-canvas-wrap {
+      background: var(--bg); border-radius: 12px; padding: 12px;
+      display: flex; align-items: center; justify-content: center;
+    }
+    #preview-canvas { border-radius: 8px; width: 100%; height: auto; display: block; }
+
+    /* ─── COMMANDS TAB ─────────────────────── */
+    .team-tabs-bar { display: flex; gap: 6px; margin-bottom: 14px; flex-wrap: wrap; }
+    .team-tab {
+      padding: 8px 20px; border-radius: 10px; border: 2px solid transparent;
+      cursor: pointer; font-size: 13px; font-weight: 700;
+      background: var(--card); color: var(--sub);
+      transition: all 0.15s; font-family: inherit;
+    }
+    .team-tab:hover { color: var(--text); }
+
+    .block-editor {
+      display: grid;
+      grid-template-columns: 185px 1fr;
+      gap: 14px;
+      margin-bottom: 14px;
+      min-height: 520px;
+    }
+
+    /* Palette */
+    .palette-panel {
+      background: var(--card); border-radius: 16px;
+      padding: 14px; border: 1px solid var(--border);
+      overflow-y: auto;
+    }
+    .palette-cat-label {
+      font-size: 10px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.08em; color: var(--muted);
+      margin-bottom: 5px; margin-top: 14px;
+    }
+    .palette-cat-label:first-child { margin-top: 0; }
+    .pal-block {
+      display: block; width: 100%; padding: 7px 10px;
+      border-radius: 8px; border: none; cursor: pointer;
+      font-size: 12px; font-weight: 600; margin-bottom: 4px;
+      text-align: left; transition: opacity 0.12s, outline 0.1s;
+      font-family: inherit; outline: 2px solid transparent; outline-offset: 2px;
+    }
+    .pal-block:hover:not(:disabled) { opacity: 0.82; }
+    .pal-block.held { outline: 2px solid white; }
+    .pal-block:disabled { opacity: 0.3; cursor: not-allowed; }
+    .pal-block.motion  { background: #1e3a8a; color: #bfdbfe; }
+    .pal-block.action  { background: #7c2d12; color: #fed7aa; }
+    .pal-block.control { background: #713f12; color: #fef08a; }
+    .pal-block.data    { background: #4c1d95; color: #ddd6fe; }
+
+    /* Program panel */
+    .program-panel {
+      background: var(--card); border-radius: 16px;
+      padding: 16px; border: 1px solid var(--border);
+      overflow-y: auto;
+      display: flex; flex-direction: column; gap: 12px;
+    }
+    .prog-header {
+      display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;
+    }
+    .prog-title { font-size: 15px; font-weight: 700; }
+    .prog-hint { font-size: 12px; color: var(--muted); }
+    .prog-clear-btn {
+      padding: 4px 10px; font-size: 11px; font-weight: 600;
+      background: transparent; border: 1px solid var(--border);
+      border-radius: 6px; color: var(--muted); cursor: pointer; font-family: inherit;
+      transition: all 0.12s;
+    }
+    .prog-clear-btn:hover { background: var(--border); color: var(--text); }
+
+    /* Variables strip */
+    .vars-strip {
+      display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+      background: var(--bg); border-radius: 10px; padding: 8px 12px;
+      border: 1px solid var(--border);
+    }
+    .vars-strip-label { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+    .var-chip {
+      display: flex; align-items: center; gap: 5px;
+      background: #4c1d95; border-radius: 7px; padding: 4px 8px;
+      font-size: 12px; color: #ddd6fe;
+    }
+    .var-chip-name { font-weight: 700; }
+    .var-chip-sep { color: rgba(255,255,255,0.35); }
+    .var-chip-val {
+      width: 42px; padding: 1px 4px; border-radius: 4px;
+      border: none; background: rgba(0,0,0,0.35); color: #ddd6fe;
+      font-size: 11px; text-align: center; font-family: inherit; font-weight: 700;
+    }
+    .var-chip-del {
+      background: none; border: none; color: rgba(255,255,255,0.35);
+      cursor: pointer; font-size: 13px; padding: 0; line-height: 1;
+    }
+    .var-chip-del:hover { color: #fca5a5; }
+    .add-var-btn {
+      padding: 4px 10px; font-size: 11px; font-weight: 700;
+      background: rgba(76,29,149,0.3); border: 1px dashed #7c3aed;
+      border-radius: 7px; color: #c4b5fd; cursor: pointer; font-family: inherit;
+    }
+    .add-var-btn:hover { background: rgba(76,29,149,0.55); }
+
+    /* Block stack */
+    .prog-stack { display: flex; flex-direction: column; }
+    .prog-empty { text-align: center; color: var(--muted); padding: 40px 0; font-size: 13px; line-height: 1.6; }
+
+    /* Drop zones */
+    .drop-zone {
+      height: 18px; border-radius: 5px;
+      border: 2px dashed transparent;
+      cursor: pointer; transition: all 0.1s;
+      display: flex; align-items: center; padding: 0 8px;
+      margin: 1px 0;
+    }
+    .drop-zone .dz-label { font-size: 10px; color: transparent; font-weight: 600; transition: color 0.1s; }
+    .drop-zone.armed { border-color: rgba(255,255,255,0.25); }
+    .drop-zone.armed .dz-label { color: rgba(255,255,255,0.25); }
+    .drop-zone.armed:hover { border-color: rgba(255,255,255,0.55); background: rgba(255,255,255,0.06); }
+    .drop-zone.armed:hover .dz-label { color: rgba(255,255,255,0.55); }
+    .drop-zone.target { border-color: white; background: rgba(255,255,255,0.12); }
+    .drop-zone.target .dz-label { color: white; }
+
+    /* Program blocks */
+    .prog-block {
+      display: flex; align-items: center; gap: 6px;
+      padding: 8px 10px; border-radius: 8px;
+      font-size: 12px; font-weight: 600;
+    }
+    .prog-block.motion  { background: #1e3a8a; color: #bfdbfe; }
+    .prog-block.action  { background: #7c2d12; color: #fed7aa; }
+    .prog-block.control { background: #78350f; color: #fef08a; border-radius: 8px 8px 2px 2px; }
+    .prog-block.data    { background: #4c1d95; color: #ddd6fe; }
+    .prog-block input[type="number"] {
+      width: 46px; padding: 2px 5px; border-radius: 5px; border: none;
+      background: rgba(0,0,0,0.3); color: inherit;
+      font-size: 12px; font-weight: 700; text-align: center; font-family: inherit;
+    }
+    .prog-block select {
+      padding: 2px 5px; border-radius: 5px; border: none;
+      background: rgba(0,0,0,0.3); color: inherit;
+      font-size: 12px; font-weight: 600; cursor: pointer; font-family: inherit;
+      max-width: 130px;
+    }
+    .prog-del {
+      margin-left: auto; background: none; border: none; flex-shrink: 0;
+      color: rgba(255,255,255,0.35); cursor: pointer;
+      font-size: 14px; padding: 0 2px; line-height: 1; border-radius: 3px;
+    }
+    .prog-del:hover { color: rgba(255,255,255,0.9); }
+
+    /* C-block (control with body) */
+    .c-block { display: flex; flex-direction: column; margin-bottom: 1px; }
+    .c-body {
+      margin-left: 22px;
+      padding: 2px 0 2px 10px;
+      border-left: 3px solid rgba(254,240,138,0.35);
+      min-height: 20px;
+    }
+    .c-cap {
+      height: 8px; background: #78350f;
+      border-radius: 0 0 6px 6px; margin-bottom: 1px;
+    }
+
+    .commands-footer { display: flex; justify-content: flex-end; }
+    .commands-footer .btn-primary { width: auto; padding: 12px 28px; }
+
+    /* ─── SIMULATION TAB ─────────────────────── */
+    .sim-layout { display: grid; grid-template-columns: 1fr 300px; gap: 16px; margin-bottom: 14px; }
+    .sim-canvas-card {
+      background: var(--card); border-radius: 16px; padding: 16px;
+      border: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: center; min-height: 400px;
+    }
+    #game-canvas { border-radius: 8px; display: block; }
+    .sim-sidebar { display: flex; flex-direction: column; gap: 12px; }
+    .score-row { display: flex; align-items: center; gap: 8px; margin-bottom: 9px; }
+    .score-row:last-child { margin-bottom: 0; }
+    .score-swatch { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
+    .score-team-name { font-size: 13px; min-width: 44px; font-weight: 600; }
+    .score-bar-track { flex: 1; height: 7px; background: var(--bg); border-radius: 4px; overflow: hidden; }
+    .score-bar-fill { height: 100%; border-radius: 4px; transition: width 0.25s ease; }
+    .score-tile-count { font-size: 13px; font-weight: 700; min-width: 28px; text-align: right; }
+    .turn-cmd-item {
+      display: flex; align-items: center; gap: 8px;
+      padding: 5px 0; border-bottom: 1px solid var(--bg); font-size: 12px;
+    }
+    .turn-cmd-item:last-child { border-bottom: none; }
+    .turn-cmd-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .turn-cmd-team { font-weight: 700; min-width: 40px; }
+    .turn-cmd-action { color: var(--sub); flex: 1; }
+    .event-item {
+      display: flex; align-items: flex-start; gap: 8px;
+      padding: 5px 0; border-bottom: 1px solid var(--bg); font-size: 12px; line-height: 1.3;
+    }
+    .event-item:last-child { border-bottom: none; }
+    .event-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; margin-top: 2px; }
+    .empty-state { text-align: center; color: var(--muted); font-size: 12px; padding: 12px 0; }
+    .winner-banner {
+      text-align: center; padding: 12px; border-radius: 12px;
+      font-weight: 700; font-size: 15px; display: none; margin-bottom: 12px;
+    }
+    .sim-controls {
+      background: var(--card); border: 1px solid var(--border); border-radius: 14px;
+      padding: 12px 20px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    }
+    .ctrl-group { display: flex; gap: 5px; }
+    .ctrl-btn {
+      width: 38px; height: 38px; border-radius: 9px;
+      border: 1px solid var(--border); background: var(--bg);
+      color: var(--text); cursor: pointer; font-size: 14px;
+      display: flex; align-items: center; justify-content: center;
+      transition: all 0.12s; font-family: inherit;
+    }
+    .ctrl-btn:hover { background: var(--border); }
+    .ctrl-btn.accent { background: var(--blue); border-color: var(--blue); color: white; }
+    .ctrl-btn.accent:hover { background: #2563eb; }
+    .turn-info { font-size: 14px; font-weight: 700; padding: 0 8px; white-space: nowrap; }
+    .speed-group { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+    .speed-label { font-size: 12px; color: var(--sub); font-weight: 600; }
+    #speed-slider { width: 80px; }
+
+    /* ─── LEVEL SELECTOR ────────────────────── */
+    .level-cards { display: grid; grid-template-columns: repeat(3,1fr); gap: 10px; }
+    .level-card {
+      border-radius: 12px; padding: 14px 12px; cursor: pointer;
+      border: 2px solid var(--border); background: var(--bg);
+      transition: all 0.15s; text-align: center; user-select: none;
+    }
+    .level-card:hover { border-color: var(--muted); background: #162032; }
+    .level-card.active {
+      border-color: #6366f1;
+      background: rgba(99,102,241,0.12);
+      box-shadow: 0 0 0 1px #6366f1;
+    }
+    .level-card-icon { font-size: 26px; margin-bottom: 6px; }
+    .level-card-title { font-size: 13px; font-weight: 800; color: var(--text); margin-bottom: 4px; }
+    .level-card-desc  { font-size: 11px; color: var(--sub); line-height: 1.4; }
+    .level-badge {
+      display: inline-block; font-size: 10px; font-weight: 700;
+      padding: 2px 7px; border-radius: 10px; margin-bottom: 6px;
+      background: var(--border); color: var(--sub); letter-spacing: 0.05em;
+    }
+    .level-card.active .level-badge { background: #6366f1; color: white; }
+
+    /* ─── CODE EDITOR VIEW ──────────────────── */
+    .view-toggle {
+      display: flex; gap: 3px;
+      background: var(--bg); padding: 3px; border-radius: 9px;
+      border: 1px solid var(--border); width: fit-content; margin-bottom: 12px;
+    }
+    .vt-btn {
+      padding: 6px 16px; border-radius: 6px; border: none;
+      cursor: pointer; font-size: 12px; font-weight: 700;
+      background: transparent; color: var(--sub); transition: all 0.12s; font-family: inherit;
+    }
+    .vt-btn.active  { background: var(--border); color: var(--text); }
+    .vt-btn:hover:not(.active) { color: var(--text); }
+
+    .code-editor-layout {
+      display: grid; grid-template-columns: 1fr 230px; gap: 14px; margin-bottom: 14px;
+    }
+    .code-left { display: flex; flex-direction: column; gap: 10px; }
+    .code-editor-card {
+      background: var(--card); border-radius: 16px; padding: 16px;
+      border: 1px solid var(--border); display: flex; flex-direction: column; gap: 10px;
+    }
+    .code-editor-header {
+      display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;
+    }
+    .code-filename { font-size: 13px; font-weight: 700; font-family: monospace; }
+    .code-textarea {
+      width: 100%; min-height: 420px;
+      background: #070d1a; color: #a8e6cf;
+      font-family: 'Fira Code', 'Cascadia Code', 'Consolas', 'Monaco', monospace;
+      font-size: 13px; line-height: 1.7;
+      border: 1px solid var(--border); border-radius: 10px;
+      padding: 14px 16px; resize: vertical; outline: none;
+      tab-size: 2; caret-color: white;
+    }
+    .code-textarea:focus { border-color: #22c55e; }
+    .code-toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .code-btn-apply {
+      padding: 7px 16px; border-radius: 8px; border: none;
+      background: #15803d; color: #bbf7d0; font-size: 12px; font-weight: 700;
+      cursor: pointer; font-family: inherit; transition: opacity 0.12s;
+    }
+    .code-btn-apply:hover { opacity: 0.85; }
+    .code-btn-load {
+      padding: 7px 14px; border-radius: 8px; border: 1px solid var(--border);
+      background: var(--bg); color: var(--sub); font-size: 12px; font-weight: 600;
+      cursor: pointer; font-family: inherit; transition: all 0.12s;
+    }
+    .code-btn-load:hover { background: var(--border); color: var(--text); }
+    .code-status {
+      font-size: 12px; padding: 7px 12px; border-radius: 8px; display: none;
+    }
+    .code-status.ok  { display:block; background:#052e16; color:#86efac; border:1px solid #14532d; }
+    .code-status.err { display:block; background:#450a0a; color:#fca5a5; border:1px solid #7f1d1d; white-space:pre-wrap; font-family:monospace; font-size:11px; }
+
+    /* Reference card */
+    .code-ref-card {
+      background: var(--card); border-radius: 16px; padding: 16px;
+      border: 1px solid var(--border); font-size: 12px; align-self: start; position: sticky; top: 0;
+    }
+    .ref-section { margin-bottom: 14px; }
+    .ref-section:last-child { margin-bottom: 0; }
+    .ref-title { font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); margin-bottom: 7px; }
+    .ref-row { display: flex; gap: 8px; align-items: baseline; padding: 3px 0; border-bottom: 1px solid var(--bg); }
+    .ref-row:last-child { border-bottom: none; }
+    .ref-code { font-family: monospace; font-size: 12px; color: #86efac; white-space: nowrap; flex-shrink: 0; }
+    .ref-desc { color: var(--sub); font-size: 11px; line-height: 1.3; }
+
+    /* ─── RESPONSIVE ────────────────────────── */
+    @media (max-width: 1000px) {
+      .setup-grid { grid-template-columns: 1fr; }
+      .block-editor { grid-template-columns: 160px 1fr; }
+      .sim-layout { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 640px) {
+      .block-editor { grid-template-columns: 1fr; }
+      .sim-layout { grid-template-columns: 1fr; }
+    }
+
+    /* ─── SCROLLBAR ─────────────────────────── */
+    ::-webkit-scrollbar { width: 5px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  </style>
+</head>
+<body>
+<div id="app">
+
+  <header>
+    <div class="logo">
+      <div class="logo-icon">🤖</div>
+      <h1><span>Robot Paint Battle</span></h1>
+    </div>
+    <nav class="tab-nav">
+      <button class="tab-btn active" data-tab="setup">⚙ Setup</button>
+      <button class="tab-btn" data-tab="commands">📋 Commands</button>
+      <button class="tab-btn" data-tab="simulation">▶ Simulate</button>
+    </nav>
+  </header>
+
+  <!-- ══ SETUP TAB ══ -->
+  <div id="tab-setup" class="tab active">
+    <div class="setup-grid">
+      <div class="setup-left">
+        <div class="card">
+          <div class="card-title">⚙ Game Configuration</div>
+          <div class="form-group">
+            <div class="form-label">Grid Size</div>
+            <div class="form-value" id="grid-size-display">10 × 10</div>
+            <input type="range" id="grid-size" min="5" max="20" value="10" />
+          </div>
+          <div class="form-group">
+            <div class="form-label">Number of Turns</div>
+            <div class="form-value" id="num-turns-display">20</div>
+            <input type="range" id="num-turns" min="5" max="200" value="20" />
+          </div>
+          <div class="form-group">
+            <div class="form-label">How to Play</div>
+            <ul class="rules-list">
+              <li><span class="rule-icon">↺</span><div><strong>Rotate Left / Right</strong> — Spin 90° to change direction</div></li>
+              <li><span class="rule-icon">⬆</span><div><strong>Move</strong> — Advance 1 tile (walls &amp; bots block)</div></li>
+              <li><span class="rule-icon">📦</span><div><strong>Load</strong> — Load a paintball into the gun</div></li>
+              <li><span class="rule-icon">🎯</span><div><strong>Shoot</strong> — Fire! Paintball paints tiles to the wall</div></li>
+              <li><span class="rule-icon">🔄</span><div><strong>Repeat / While / If</strong> — Control flow blocks</div></li>
+              <li><span class="rule-icon">💥</span><div><strong>Burst</strong> — Load 4× without shooting and your bot explodes a diamond of paint around itself!</div></li>
+              <li><span class="rule-icon">🏆</span><div>Most tiles painted in your color at the end wins!</div></li>
+            </ul>
+          </div>
+          <div class="form-group">
+            <div class="form-label">Map Type</div>
+            <div class="level-cards" id="level-cards">
+              <div class="level-card active" data-level="1">
+                <div class="level-badge">LEVEL 1</div>
+                <div class="level-card-icon">🟩</div>
+                <div class="level-card-title">Open Field</div>
+                <div class="level-card-desc">Empty grid — no obstacles. Pure strategy.</div>
+              </div>
+              <div class="level-card" data-level="2">
+                <div class="level-badge">LEVEL 2</div>
+                <div class="level-card-icon">🧱</div>
+                <div class="level-card-title">Wall Maze</div>
+                <div class="level-card-desc">Randomly placed wall sections. All tiles remain reachable.</div>
+              </div>
+              <div class="level-card" data-level="3">
+                <div class="level-badge">LEVEL 3</div>
+                <div class="level-card-icon">🪞</div>
+                <div class="level-card-title">Fortress</div>
+                <div class="level-card-desc">Dense walls + a fortified center. Navigate chokepoints to claim territory.</div>
+              </div>
+            </div>
+          </div>
+
+          <button id="setup-btn" class="btn-primary">Configure Commands →</button>
+        </div>
+      </div>
+      <div>
+        <div class="card" style="margin-bottom:14px;">
+          <div class="card-title">🤖 Teams</div>
+          <div class="teams-grid" id="teams-grid"></div>
+        </div>
+        <div class="card">
+          <div class="card-title">🗺 Starting Grid</div>
+          <div class="preview-canvas-wrap">
+            <canvas id="preview-canvas" width="400" height="400"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ COMMANDS TAB ══ -->
+  <div id="tab-commands" class="tab">
+    <div class="team-tabs-bar" id="team-tabs-bar"></div>
+    <div id="view-toggle-wrap"></div>
+    <div class="block-editor" id="block-editor">
+      <div class="palette-panel" id="palette-panel"></div>
+      <div class="program-panel" id="program-panel"></div>
+    </div>
+    <div id="code-editor-wrap" style="display:none;"></div>
+    <div class="commands-footer">
+      <button id="simulate-btn" class="btn-primary">▶ Run Simulation</button>
+    </div>
+  </div>
+
+  <!-- ══ SIMULATION TAB ══ -->
+  <div id="tab-simulation" class="tab">
+    <div id="winner-banner" class="winner-banner"></div>
+    <div class="sim-layout">
+      <div class="sim-canvas-card" id="canvas-wrap">
+        <canvas id="game-canvas"></canvas>
+      </div>
+      <div class="sim-sidebar">
+        <div class="card" id="score-card">
+          <div class="card-title">🏆 Scoreboard</div>
+          <div id="score-rows"></div>
+          <div style="font-size:11px; color:var(--muted); margin-top:10px;">
+            <span id="painted-tiles">0</span> / <span id="total-tiles">0</span> tiles painted
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">⚡ This Turn</div>
+          <div id="turn-commands"></div>
+        </div>
+        <div class="card" style="flex:1; min-height:0; overflow:hidden;">
+          <div class="card-title">📋 Events</div>
+          <div id="event-log" style="overflow-y:auto; max-height:200px;"></div>
+        </div>
+      </div>
+    </div>
+    <div class="sim-controls">
+      <div class="ctrl-group">
+        <button class="ctrl-btn" id="btn-first"  title="Go to start">⏮</button>
+        <button class="ctrl-btn" id="btn-prev"   title="Previous turn">◀</button>
+        <button class="ctrl-btn accent" id="btn-play" title="Play / Pause">▶</button>
+        <button class="ctrl-btn" id="btn-next"   title="Next turn">▶▶</button>
+        <button class="ctrl-btn" id="btn-last"   title="Go to end">⏭</button>
+      </div>
+      <div class="turn-info">Turn <span id="cur-turn">0</span> / <span id="tot-turns">0</span></div>
+      <div class="speed-group">
+        <span class="speed-label">Speed</span>
+        <input type="range" id="speed-slider" min="1" max="10" value="5" />
+        <span class="speed-label" id="speed-val">5×</span>
+      </div>
+    </div>
+  </div>
+
+</div>
+<script>
+// ═══════════════════════════════════════════════════════
+//  CONSTANTS
+// ═══════════════════════════════════════════════════════
+// Terrain tile types
+const T_EMPTY    = 0;
+const T_WALL     = 1;
+const T_MIRROR_F = 2;  // '/' — deflects E↔N, W↔S
+const T_MIRROR_B = 3;  // '\' — deflects E↔S, W↔N
+
+const TEAMS = [
+  { id:0, name:'Red',    color:'#ef4444', light:'#fee2e2', startDir:'E' },
+  { id:1, name:'Blue',   color:'#3b82f6', light:'#dbeafe', startDir:'S' },
+  { id:2, name:'Green',  color:'#22c55e', light:'#dcfce7', startDir:'N' },
+  { id:3, name:'Yellow', color:'#f59e0b', light:'#fef3c7', startDir:'W' },
+];
+const BOT_START = gs => [
+  { x:0,    y:0,    dir:'E' },
+  { x:gs-1, y:0,    dir:'S' },
+  { x:0,    y:gs-1, dir:'N' },
+  { x:gs-1, y:gs-1, dir:'W' },
+];
+const ROT_L = { N:'W', W:'S', S:'E', E:'N' };
+const ROT_R = { N:'E', E:'S', S:'W', W:'N' };
+const DX    = { N:0,  E:1,  S:0,  W:-1 };
+const DY    = { N:-1, E:0,  S:1,  W:0  };
+
+// Block definitions: type → { cat, icon, label, hasBody }
+const BLOCK_DEFS = {
+  move:         { cat:'motion',  icon:'⬆',  label:'Move',           hasBody:false },
+  rotate_left:  { cat:'motion',  icon:'↺',  label:'Rotate Left',    hasBody:false },
+  rotate_right: { cat:'motion',  icon:'↻',  label:'Rotate Right',   hasBody:false },
+  load:         { cat:'action',  icon:'📦', label:'Load',           hasBody:false },
+  shoot:        { cat:'action',  icon:'🎯', label:'Shoot',          hasBody:false },
+  wait:         { cat:'action',  icon:'⏸', label:'Wait',           hasBody:false },
+  repeat:       { cat:'control', icon:'🔄', label:'Repeat … times', hasBody:true  },
+  while_block:  { cat:'control', icon:'🔁', label:'While …',        hasBody:true  },
+  if_block:     { cat:'control', icon:'❓', label:'If …',           hasBody:true  },
+  set_var:      { cat:'data',    icon:'📝', label:'Set variable',   hasBody:false },
+  change_var:   { cat:'data',    icon:'±',  label:'Change variable',hasBody:false },
+};
+const PALETTE_GROUPS = [
+  { label:'Motion',    types:['move','rotate_left','rotate_right'] },
+  { label:'Action',    types:['load','shoot','wait'] },
+  { label:'Control',   types:['repeat','while_block','if_block'] },
+  { label:'Variables', types:['set_var','change_var'] },
+];
+const CONDITIONS = [
+  { id:'always',     label:'always',         hasVar:false, hasVal:false },
+  { id:'loaded',     label:'bot is loaded',  hasVar:false, hasVal:false },
+  { id:'not_loaded', label:'not loaded',     hasVar:false, hasVal:false },
+  { id:'var_lt',     label:'var <',          hasVar:true,  hasVal:true  },
+  { id:'var_lte',    label:'var ≤',          hasVar:true,  hasVal:true  },
+  { id:'var_gt',     label:'var >',          hasVar:true,  hasVal:true  },
+  { id:'var_gte',    label:'var ≥',          hasVar:true,  hasVal:true  },
+  { id:'var_eq',     label:'var =',          hasVar:true,  hasVal:true  },
+];
+
+// ═══════════════════════════════════════════════════════
+//  APP STATE
+// ═══════════════════════════════════════════════════════
+const app = {
+  gridSize:    10,
+  numTurns:    20,
+  level:    1,     // 1 = open, 2 = walls, 3 = fortress
+  terrain:  null,  // 2-D array generated at sim start (T_EMPTY/WALL/MIRROR_F/MIRROR_B)
+  // Block programs (one per team)
+  programs: [
+    { blocks:[], variables:{} },
+    { blocks:[], variables:{} },
+    { blocks:[], variables:{} },
+    { blocks:[], variables:{} },
+  ],
+  activeTeam:  0,
+  viewMode:    'blocks',  // 'blocks' | 'code'
+  teamCode:    ['', '', '', ''],  // raw code string per team
+  heldBlock:   null,   // string block type currently selected in palette
+  arrayMap:    new Map(),  // _id → array reference
+  idCounter:   0,
+  // Simulation
+  states:      [],
+  currentTurn: 0,
+  playing:     false,
+  playTimer:   null,
+};
+
+// ═══════════════════════════════════════════════════════
+//  BLOCK HELPERS
+// ═══════════════════════════════════════════════════════
+
+function nextId() { return 'b' + (++app.idCounter); }
+
+function tagArr(arr) {
+  if (!arr._id) {
+    arr._id = 'a' + (++app.idCounter);
+    app.arrayMap.set(arr._id, arr);
+  }
+  return arr;
+}
+
+function tagAllArrays(blocks) {
+  tagArr(blocks);
+  for (const b of blocks) if (b.body) tagAllArrays(b.body);
+}
+
+function getVars(teamId) { return Object.keys(app.programs[teamId].variables); }
+
+function makeBlock(type, teamId) {
+  const vars = getVars(teamId);
+  const v0 = vars[0] || null;
+  switch (type) {
+    case 'repeat':      return { id:nextId(), type, count:3, body:[] };
+    case 'while_block': return { id:nextId(), type, condition:{ type:'always' }, body:[] };
+    case 'if_block':    return { id:nextId(), type, condition:{ type:'loaded' },  body:[] };
+    case 'set_var':     return { id:nextId(), type, varName:v0, value:0 };
+    case 'change_var':  return { id:nextId(), type, varName:v0, delta:1 };
+    default:            return { id:nextId(), type };
+  }
+}
+
+function findBlock(blocks, id) {
+  for (const b of blocks) {
+    if (b.id === id) return b;
+    if (b.body) { const f = findBlock(b.body, id); if (f) return f; }
+  }
+  return null;
+}
+
+function removeBlock(blocks, id) {
+  for (let i = 0; i < blocks.length; i++) {
+    if (blocks[i].id === id) { blocks.splice(i,1); return true; }
+    if (blocks[i].body && removeBlock(blocks[i].body, id)) return true;
+  }
+  return false;
+}
+
+// ═══════════════════════════════════════════════════════
+//  BOT INTERPRETER  (one instance per team per simulation)
+// ═══════════════════════════════════════════════════════
+class BotInterpreter {
+  constructor(program) {
+    this.vars = {};
+    for (const [k,v] of Object.entries(program.variables || {}))
+      this.vars[k] = Number(v) || 0;
+    this.stack = [{ blocks: program.blocks, pc: 0 }];
+  }
+
+  // Returns the next action string for this turn, given current bot game state.
+  // botState: { loaded: bool }
+  nextAction(botState) {
+    let safety = 0;
+    while (this.stack.length > 0 && safety++ < 200000) {
+      const top = this.stack[this.stack.length - 1];
+
+      // Frame exhausted → pop and maybe loop
+      if (top.pc >= top.blocks.length) {
+        this.stack.pop();
+        if (top.loopType === 'repeat' && top.remaining > 0) {
+          this.stack.push({ ...top, pc:0, remaining: top.remaining - 1 });
+        } else if (top.loopType === 'while' && this._evalCond(top.cond, botState)) {
+          this.stack.push({ ...top, pc:0 });
+        }
+        continue;
+      }
+
+      const block = top.blocks[top.pc++];
+
+      // Action block → emit and return
+      if (['move','rotate_left','rotate_right','load','shoot','wait'].includes(block.type)) {
+        return block.type;
+      }
+
+      // Control / data blocks → no action emitted, continue loop
+      switch (block.type) {
+        case 'repeat': {
+          const n = Math.max(1, parseInt(block.count) || 1);
+          if (block.body && block.body.length > 0)
+            this.stack.push({ blocks: block.body, pc:0, loopType:'repeat', remaining: n - 1 });
+          break;
+        }
+        case 'while_block':
+          if (this._evalCond(block.condition, botState) && block.body && block.body.length > 0)
+            this.stack.push({ blocks: block.body, pc:0, loopType:'while', cond: block.condition });
+          break;
+        case 'if_block':
+          if (this._evalCond(block.condition, botState) && block.body && block.body.length > 0)
+            this.stack.push({ blocks: block.body, pc:0, loopType:'if' });
+          break;
+        case 'set_var':
+          if (block.varName != null) this.vars[block.varName] = parseInt(block.value) || 0;
+          break;
+        case 'change_var':
+          if (block.varName != null)
+            this.vars[block.varName] = (this.vars[block.varName] || 0) + (parseInt(block.delta) || 0);
+          break;
+      }
+    }
+    return 'wait'; // program finished or safety limit hit
+  }
+
+  _evalCond(cond, botState) {
+    if (!cond) return true;
+    const v = cond.varName != null ? (this.vars[cond.varName] || 0) : 0;
+    const n = parseInt(cond.value) || 0;
+    switch (cond.type) {
+      case 'always':     return true;
+      case 'loaded':     return !!botState.loaded;
+      case 'not_loaded': return !botState.loaded;
+      case 'var_lt':     return v <  n;
+      case 'var_lte':    return v <= n;
+      case 'var_gt':     return v >  n;
+      case 'var_gte':    return v >= n;
+      case 'var_eq':     return v === n;
+      default:           return false;
+    }
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+//  TERRAIN GENERATION
+// ═══════════════════════════════════════════════════════
+
+function emptyTerrain(gs) {
+  return Array.from({ length:gs }, () => Array(gs).fill(T_EMPTY));
+}
+
+// Clear a 2-tile radius around every bot starting corner
+function clearCorners(terrain, gs) {
+  for (const b of BOT_START(gs)) {
+    for (let dy=-2; dy<=2; dy++) for (let dx=-2; dx<=2; dx++) {
+      const nx=b.x+dx, ny=b.y+dy;
+      if (nx>=0&&nx<gs&&ny>=0&&ny<gs) terrain[ny][nx]=T_EMPTY;
+    }
+  }
+}
+
+// BFS connectivity: every T_EMPTY cell reachable from one seed
+function allConnected(terrain, gs) {
+  let seed=null, total=0;
+  for (let y=0;y<gs;y++) for (let x=0;x<gs;x++)
+    if (terrain[y][x]!==T_WALL) { total++; if (!seed) seed={x,y}; }
+  if (!seed) return true;
+  const vis=new Set([`${seed.x},${seed.y}`]);
+  const q=[seed];
+  while (q.length) {
+    const {x,y}=q.shift();
+    for (const [nx,ny] of [[x+1,y],[x-1,y],[x,y+1],[x,y-1]]) {
+      const k=`${nx},${ny}`;
+      if (nx>=0&&nx<gs&&ny>=0&&ny<gs&&terrain[ny][nx]!==T_WALL&&!vis.has(k))
+        { vis.add(k); q.push({x:nx,y:ny}); }
+    }
+  }
+  return vis.size===total;
+}
+
+// Level 2: random wall segments, guaranteed connectivity
+function generateLevel2Terrain(gs) {
+  for (let attempt=0; attempt<120; attempt++) {
+    const t=emptyTerrain(gs);
+    const numSegs = Math.round(gs * 0.7);
+    for (let w=0; w<numSegs; w++) {
+      const horiz = Math.random()<0.5;
+      const len   = 2 + Math.floor(Math.random()*3);   // 2-4 tiles
+      const x = 1 + Math.floor(Math.random()*(gs-2));
+      const y = 1 + Math.floor(Math.random()*(gs-2));
+      for (let i=0;i<len;i++) {
+        const wx = Math.min(gs-2, horiz ? x+i : x);
+        const wy = Math.min(gs-2, horiz ? y   : y+i);
+        t[wy][wx]=T_WALL;
+      }
+    }
+    clearCorners(t, gs);
+    if (allConnected(t, gs)) return t;
+  }
+  return emptyTerrain(gs); // fallback
+}
+
+// Level 3: Fortress — dense walls with a fortified center and corridor chokepoints
+function generateLevel3Terrain(gs) {
+  for (let attempt = 0; attempt < 150; attempt++) {
+    const t = emptyTerrain(gs);
+    const c = Math.floor(gs / 2);
+    const fortress = Math.max(1, Math.floor(gs / 6)); // half-size of center block
+
+    // ── Central fortress: solid rectangle with narrow N/S and E/W corridors cut through ──
+    for (let dy = -fortress; dy <= fortress; dy++) {
+      for (let dx = -fortress; dx <= fortress; dx++) {
+        const x = c+dx, y = c+dy;
+        if (x>0 && x<gs-1 && y>0 && y<gs-1) t[y][x] = T_WALL;
+      }
+    }
+    // Carve single-tile corridors through center (N↔S and E↔W)
+    for (let i = -(fortress+1); i <= fortress+1; i++) {
+      if (c+i > 0 && c+i < gs-1) { t[c+i][c] = T_EMPTY; t[c][c+i] = T_EMPTY; }
+    }
+
+    // ── Dense random wall segments throughout each quadrant ──
+    const numSegs = Math.round(gs * 1.6);
+    for (let w = 0; w < numSegs; w++) {
+      const horiz = Math.random() < 0.5;
+      const len   = 2 + Math.floor(Math.random() * 4); // 2–5 tiles
+      const x     = 1 + Math.floor(Math.random() * (gs - 2));
+      const y     = 1 + Math.floor(Math.random() * (gs - 2));
+      for (let i = 0; i < len; i++) {
+        const wx = Math.min(gs-2, horiz ? x+i : x);
+        const wy = Math.min(gs-2, horiz ? y   : y+i);
+        t[wy][wx] = T_WALL;
+      }
+    }
+
+    // ── Additional L-shaped barriers at quadrant midpoints ──
+    const q = Math.max(2, Math.floor(gs / 4));
+    const midpoints = [ [q, q], [gs-1-q, q], [q, gs-1-q], [gs-1-q, gs-1-q] ];
+    for (const [bx, by] of midpoints) {
+      for (let i = 0; i < 3; i++) if (bx+i>0&&bx+i<gs-1&&by>0&&by<gs-1) t[by][bx+i]   = T_WALL;
+      for (let i = 0; i < 2; i++) if (bx>0&&bx<gs-1&&by+i>0&&by+i<gs-1) t[by+i][bx]   = T_WALL;
+    }
+
+    clearCorners(t, gs);
+    if (allConnected(t, gs)) return t;
+  }
+  return emptyTerrain(gs); // fallback
+}
+
+function generateTerrain(gs, level) {
+  if (level===2) return generateLevel2Terrain(gs);
+  if (level===3) return generateLevel3Terrain(gs);
+  return emptyTerrain(gs);
+}
+
+// ═══════════════════════════════════════════════════════
+//  SIMULATION ENGINE
+// ═══════════════════════════════════════════════════════
+
+const BURST_THRESHOLD = 4;  // consecutive loads needed for a burst
+const BURST_RADIUS    = 4;  // Manhattan radius of the diamond
+
+function createInitialState(gs) {
+  const grid = Array.from({ length:gs }, () => Array(gs).fill(null));
+  const bots  = BOT_START(gs).map(b => ({ ...b, loaded:false, loadCount:0 }));
+  bots.forEach((b,i) => { grid[b.y][b.x] = i; });
+  return { grid, bots, shots:[], events:[] };
+}
+
+// Paint a diamond of BURST_RADIUS around (cx,cy). Returns path of tiles painted.
+function burstPaint(terrain, grid, gs, cx, cy, teamId) {
+  const path = [];
+  for (let dy=-BURST_RADIUS; dy<=BURST_RADIUS; dy++) {
+    for (let dx=-BURST_RADIUS; dx<=BURST_RADIUS; dx++) {
+      if (Math.abs(dx)+Math.abs(dy) > BURST_RADIUS) continue;
+      const x=cx+dx, y=cy+dy;
+      if (x<0||x>=gs||y<0||y>=gs) continue;
+      if (terrain[y][x]===T_WALL) continue;
+      grid[y][x] = teamId;
+      path.push({ x, y });
+    }
+  }
+  return path;
+}
+
+function cloneState(s) {
+  return {
+    grid:   s.grid.map(r => [...r]),
+    bots:   s.bots.map(b => ({ ...b })),
+    shots:  [],
+    events: [],
+  };
+}
+
+// Trace a paintball through the terrain, respecting walls and mirror deflections.
+// Returns path array of {x,y} tiles painted (excludes origin tile).
+function tracePaintball(terrain, grid, gs, startX, startY, startDx, startDy, teamId) {
+  const path = [];
+  let x=startX, y=startY, cdx=startDx, cdy=startDy;
+  const MAX_BOUNCES = gs * gs * 2; // safety cap against mirror loops
+  for (let step=0; step<MAX_BOUNCES; step++) {
+    x += cdx; y += cdy;
+    if (x<0||x>=gs||y<0||y>=gs) break;        // left the grid
+    const cell = terrain[y][x];
+    if (cell===T_WALL) break;                   // stopped by wall
+    grid[y][x] = teamId;                        // paint the tile
+    path.push({ x, y });
+    if (cell===T_MIRROR_F) {                    // '/' mirror: swap & negate
+      [cdx,cdy] = [-cdy,-cdx];
+    } else if (cell===T_MIRROR_B) {             // '\' mirror: swap
+      [cdx,cdy] = [cdy,cdx];
+    }
+  }
+  return path;
+}
+
+function runSimulation(gs, numTurns, programs, terrain) {
+  const states      = [ createInitialState(gs) ];
+  const interpreters = programs.map(p => new BotInterpreter(p));
+
+  for (let t = 0; t < numTurns; t++) {
+    const cur  = cloneState(states[t]);
+    const evts = [];
+
+    const actions = cur.bots.map((bot,i) => interpreters[i].nextAction({ loaded: bot.loaded }));
+
+    // Pre-collect move targets for collision detection
+    const targets = cur.bots.map((bot,i) =>
+      actions[i] === 'move' ? { x: bot.x + DX[bot.dir], y: bot.y + DY[bot.dir] } : null
+    );
+
+    for (let i = 0; i < 4; i++) {
+      const cmd = actions[i];
+      const bot = cur.bots[i];
+
+      switch (cmd) {
+        case 'rotate_left':
+          bot.dir = ROT_L[bot.dir];
+          evts.push({ teamId:i, text:`Rotated left → ${bot.dir}` });
+          break;
+        case 'rotate_right':
+          bot.dir = ROT_R[bot.dir];
+          evts.push({ teamId:i, text:`Rotated right → ${bot.dir}` });
+          break;
+        case 'move': {
+          const tgt = targets[i];
+          const { x:nx, y:ny } = tgt;
+          if (nx<0||nx>=gs||ny<0||ny>=gs||terrain[ny][nx]===T_WALL) {
+            evts.push({ teamId:i, text:'Move blocked' }); break;
+          }
+          const occupied  = cur.bots.some((ob,j) => j!==i && ob.x===nx && ob.y===ny);
+          const contested = targets.some((m,j)  => j!==i && m && m.x===nx && m.y===ny);
+          if (occupied||contested) { evts.push({ teamId:i, text:'Move blocked' }); break; }
+          bot.x=nx; bot.y=ny;
+          cur.grid[ny][nx]=i;
+          evts.push({ teamId:i, text:`Moved to (${nx},${ny})` });
+          break;
+        }
+        case 'load':
+          bot.loaded    = true;
+          bot.loadCount = (bot.loadCount || 0) + 1;
+          if (bot.loadCount >= BURST_THRESHOLD) {
+            // Overcharged — release a diamond burst!
+            bot.loaded    = false;
+            bot.loadCount = 0;
+            const bpath = burstPaint(terrain, cur.grid, gs, bot.x, bot.y, i);
+            cur.shots.push({ teamId:i, path:bpath, isBurst:true });
+            evts.push({ teamId:i, text:`💥 BURST! Diamond painted ${bpath.length} tiles!` });
+          } else {
+            const rem = BURST_THRESHOLD - bot.loadCount;
+            evts.push({ teamId:i, text:`Loaded 📦 (${bot.loadCount}/${BURST_THRESHOLD} — ${rem} more to burst!)` });
+          }
+          break;
+        case 'shoot':
+          if (!bot.loaded) {
+            evts.push({ teamId:i, text:'Shoot failed — not loaded!' });
+          } else {
+            bot.loaded    = false;
+            bot.loadCount = 0;   // firing resets the overcharge counter
+            const path = tracePaintball(terrain, cur.grid, gs,
+              bot.x, bot.y, DX[bot.dir], DY[bot.dir], i);
+            if (path.length>0) {
+              cur.shots.push({ teamId:i, path });
+              evts.push({ teamId:i, text:`Fired ${bot.dir} — painted ${path.length} tile${path.length!==1?'s':''}! 🎯` });
+            } else {
+              evts.push({ teamId:i, text:'Fired into wall (no effect)' });
+            }
+          }
+          break;
+      }
+    }
+    cur.events=evts;
+    states.push(cur);
+  }
+  return states;
+}
+
+function computeScores(grid) {
+  const s = [0,0,0,0];
+  for (const row of grid) for (const v of row) if (v!==null) s[v]++;
+  return s;
+}
+
+// ═══════════════════════════════════════════════════════
+//  CANVAS RENDERER
+// ═══════════════════════════════════════════════════════
+
+function renderCanvas(canvas, state, gs, terrain) {
+  const ctx  = canvas.getContext('2d');
+  const W    = canvas.width, H = canvas.height;
+  const cell = Math.min(W,H) / gs;
+  const ox   = (W - cell*gs) / 2, oy = (H - cell*gs) / 2;
+
+  ctx.clearRect(0,0,W,H);
+
+  // Tiles + terrain
+  for (let y=0; y<gs; y++) {
+    for (let x=0; x<gs; x++) {
+      const tx  = ox + x*cell, ty = oy + y*cell;
+      const ter = terrain ? terrain[y][x] : T_EMPTY;
+      const tid = state.grid[y][x];
+
+      if (ter === T_WALL) {
+        // Solid wall — dark stone look
+        ctx.fillStyle = '#1a1a2e';
+        ctx.fillRect(tx, ty, cell, cell);
+        // Bevel highlight
+        ctx.fillStyle = 'rgba(255,255,255,0.05)';
+        ctx.fillRect(tx, ty, cell, 2);
+        ctx.fillRect(tx, ty, 2, cell);
+        ctx.fillStyle = 'rgba(0,0,0,0.3)';
+        ctx.fillRect(tx+cell-2, ty, 2, cell);
+        ctx.fillRect(tx, ty+cell-2, cell, 2);
+      } else {
+        // Normal floor tile (painted or empty)
+        ctx.fillStyle = tid!==null ? hexA(TEAMS[tid].color, 0.55) : '#1e293b';
+        ctx.fillRect(tx+0.5, ty+0.5, cell-1, cell-1);
+      }
+    }
+  }
+
+  // Grid lines (skip walls)
+  ctx.strokeStyle='#0f172a'; ctx.lineWidth=1;
+  for (let i=0; i<=gs; i++) {
+    ctx.beginPath(); ctx.moveTo(ox+i*cell,oy); ctx.lineTo(ox+i*cell,oy+gs*cell); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(ox,oy+i*cell); ctx.lineTo(ox+gs*cell,oy+i*cell); ctx.stroke();
+  }
+
+  // Mirror tiles
+  if (terrain) {
+    for (let y=0; y<gs; y++) {
+      for (let x=0; x<gs; x++) {
+        const ter = terrain[y][x];
+        if (ter!==T_MIRROR_F && ter!==T_MIRROR_B) continue;
+        const tx=ox+x*cell, ty=oy+y*cell;
+        const pad=cell*0.18, lw=Math.max(1.5, cell*0.08);
+        ctx.save();
+        ctx.strokeStyle='rgba(167,243,208,0.85)'; // teal-ish glow
+        ctx.lineWidth=lw;
+        ctx.lineCap='round';
+        ctx.shadowColor='#6ee7b7';
+        ctx.shadowBlur=cell*0.4;
+        ctx.beginPath();
+        if (ter===T_MIRROR_F) {  // '/' goes bottom-left to top-right
+          ctx.moveTo(tx+pad,      ty+cell-pad);
+          ctx.lineTo(tx+cell-pad, ty+pad);
+        } else {                 // '\' goes top-left to bottom-right
+          ctx.moveTo(tx+pad,      ty+pad);
+          ctx.lineTo(tx+cell-pad, ty+cell-pad);
+        }
+        ctx.stroke();
+        ctx.restore();
+      }
+    }
+  }
+
+  // Burst shots — diamond bloom on each painted tile
+  for (const shot of (state.shots||[])) {
+    if (!shot.isBurst || !shot.path.length) continue;
+    const col = TEAMS[shot.teamId].color;
+    ctx.save();
+    ctx.shadowColor=col; ctx.shadowBlur=cell*1.2;
+    for (const tile of shot.path) {
+      const tcx=ox+(tile.x+0.5)*cell, tcy=oy+(tile.y+0.5)*cell;
+      const grd=ctx.createRadialGradient(tcx,tcy,0,tcx,tcy,cell*0.5);
+      grd.addColorStop(0, hexA(col,0.9));
+      grd.addColorStop(1, hexA(col,0.05));
+      ctx.fillStyle=grd;
+      ctx.beginPath(); ctx.arc(tcx,tcy,cell*0.48,0,Math.PI*2); ctx.fill();
+    }
+    // Central star flash
+    const ctr=shot.path[Math.floor(shot.path.length/2)];
+    const scx=ox+(ctr.x+0.5)*cell, scy=oy+(ctr.y+0.5)*cell;
+    ctx.fillStyle='rgba(255,255,255,0.8)';
+    ctx.shadowBlur=cell*2;
+    ctx.beginPath(); ctx.arc(scx,scy,cell*0.25,0,Math.PI*2); ctx.fill();
+    ctx.restore();
+  }
+
+  // Regular shot trails (linear + mirror paths)
+  for (const shot of (state.shots||[])) {
+    if (shot.isBurst || !shot.path.length) continue;
+    const col = TEAMS[shot.teamId].color;
+    ctx.save();
+    ctx.strokeStyle = hexA(col,0.55); ctx.lineWidth = Math.max(2,cell*0.18);
+    ctx.lineCap='round'; ctx.shadowColor=col; ctx.shadowBlur=cell*0.5;
+    ctx.beginPath();
+    ctx.moveTo(ox+(shot.path[0].x+0.5)*cell, oy+(shot.path[0].y+0.5)*cell);
+    for (let k=1;k<shot.path.length;k++)
+      ctx.lineTo(ox+(shot.path[k].x+0.5)*cell, oy+(shot.path[k].y+0.5)*cell);
+    ctx.stroke();
+    const tip=shot.path[shot.path.length-1];
+    const tcx=ox+(tip.x+0.5)*cell, tcy=oy+(tip.y+0.5)*cell, r=cell*0.21;
+    ctx.shadowBlur=cell*0.6; ctx.fillStyle=col;
+    ctx.beginPath(); ctx.arc(tcx,tcy,r,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='rgba(255,255,255,0.6)';
+    ctx.beginPath(); ctx.arc(tcx-r*.3,tcy-r*.3,r*.28,0,Math.PI*2); ctx.fill();
+    ctx.restore();
+  }
+
+  // Bots
+  for (let i=0;i<4;i++) {
+    const bot=state.bots[i], team=TEAMS[i];
+    const cx=ox+(bot.x+0.5)*cell, cy=oy+(bot.y+0.5)*cell, r=cell*0.39;
+    ctx.fillStyle='rgba(0,0,0,0.35)';
+    ctx.beginPath(); ctx.ellipse(cx,cy+r*.85,r*.55,r*.18,0,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle=team.color;
+    ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2); ctx.fill();
+    ctx.strokeStyle='rgba(255,255,255,0.85)'; ctx.lineWidth=Math.max(1.5,cell*.045); ctx.stroke();
+    const angle={N:-Math.PI/2,E:0,S:Math.PI/2,W:Math.PI}[bot.dir];
+    ctx.save(); ctx.translate(cx,cy); ctx.rotate(angle);
+    const al=r*.68; ctx.fillStyle='rgba(255,255,255,0.92)';
+    ctx.beginPath(); ctx.moveTo(al,0); ctx.lineTo(al*.35,-al*.42); ctx.lineTo(al*.35,al*.42); ctx.closePath(); ctx.fill();
+    ctx.restore();
+    // Charge-up warning glow when loadCount >= 2
+    const lc = bot.loadCount || 0;
+    if (lc >= 2) {
+      const warningCol = lc === 3 ? '#f97316' : '#fbbf24';
+      ctx.save();
+      ctx.shadowColor=warningCol; ctx.shadowBlur=cell*(lc===3?1.4:0.7);
+      ctx.strokeStyle=warningCol; ctx.lineWidth=Math.max(1.5,cell*0.06);
+      ctx.beginPath(); ctx.arc(cx,cy,r+cell*0.04,0,Math.PI*2); ctx.stroke();
+      ctx.restore();
+    }
+
+    // Loaded gold pip
+    if (bot.loaded) {
+      const dr=Math.max(3,cell*.13);
+      ctx.fillStyle='#fbbf24'; ctx.beginPath(); ctx.arc(cx+r*.62,cy-r*.62,dr,0,Math.PI*2); ctx.fill();
+      ctx.strokeStyle='rgba(0,0,0,0.5)'; ctx.lineWidth=1; ctx.stroke();
+    }
+
+    // Charge pips (small squares below the loaded pip, showing loadCount/BURST_THRESHOLD)
+    if (lc > 0) {
+      const pipSize = Math.max(2, cell*0.1);
+      const pipGap  = pipSize * 1.6;
+      const totalW  = (BURST_THRESHOLD-1) * pipGap;
+      for (let p=0; p<BURST_THRESHOLD-1; p++) {
+        const px = cx - totalW/2 + p*pipGap;
+        const py = cy + r*0.78;
+        ctx.fillStyle = p < lc ? '#f97316' : 'rgba(255,255,255,0.15)';
+        ctx.fillRect(px-pipSize/2, py-pipSize/2, pipSize, pipSize);
+      }
+    }
+
+    const fs=Math.max(8,cell*.27);
+    ctx.fillStyle='white'; ctx.font=`900 ${fs}px -apple-system,sans-serif`;
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText(team.name[0],cx,cy+fs*.06);
+  }
+}
+
+function hexA(hex,alpha) {
+  const r=parseInt(hex.slice(1,3),16), g=parseInt(hex.slice(3,5),16), b=parseInt(hex.slice(5,7),16);
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+
+// ═══════════════════════════════════════════════════════
+//  SETUP TAB
+// ═══════════════════════════════════════════════════════
+
+function renderTeamsGrid() {
+  const corners=['Top-Left','Top-Right','Bottom-Left','Bottom-Right'];
+  const dirs   =['East','South','North','West'];
+  document.getElementById('teams-grid').innerHTML = TEAMS.map((t,i)=>`
+    <div class="team-preview-card" style="background:${t.color}18;border-color:${t.color}44;">
+      <div class="team-preview-name" style="color:${t.color};">${t.name}</div>
+      <div class="team-preview-meta">${corners[i]} · faces ${dirs[i]}</div>
+    </div>
+  `).join('');
+}
+
+function renderPreview() {
+  const c=document.getElementById('preview-canvas');
+  c.width=c.height=400;
+  const terrain=generateTerrain(app.gridSize, app.level);
+  renderCanvas(c, createInitialState(app.gridSize), app.gridSize, terrain);
+}
+
+// ═══════════════════════════════════════════════════════
+//  CODE EDITOR — PARSER
+//  Converts the mini text-language used in the team .js
+//  files into the same block-tree the UI editor produces.
+// ═══════════════════════════════════════════════════════
+
+function tokenize(src) {
+  // Strip // comments, then lex
+  const stripped = src.replace(/\/\/[^\n]*/g, ' ');
+  const re = /\+\+|--|<=|>=|==|!=|\+=|-=|[a-zA-Z_]\w*|\d+|[(){};=<>!+\-]/g;
+  return stripped.match(re) || [];
+}
+
+class ProgParser {
+  constructor(code) {
+    this.toks = tokenize(code);
+    this.pos  = 0;
+  }
+
+  peek(off = 0) { return this.toks[this.pos + off]; }
+  next()  { return this.toks[this.pos++]; }
+  eat(t)  {
+    if (this.peek() !== t) throw new Error(`Expected '${t}' but got '${this.peek() ?? 'end of file'}'`);
+    return this.next();
+  }
+  tryEat(t) { if (this.peek() === t) { this.next(); return true; } return false; }
+
+  parse() {
+    const vars   = {};
+    const blocks = this.stmtList(vars, undefined);
+    return { variables: vars, blocks };
+  }
+
+  stmtList(vars, stopAt) {
+    const list = [];
+    while (this.pos < this.toks.length && this.peek() !== stopAt) {
+      try {
+        const s = this.stmt(vars);
+        if (s) list.push(s);
+      } catch (e) {
+        // skip past next ';' or '}' and keep going
+        while (this.pos < this.toks.length && this.peek() !== ';' && this.peek() !== '}') this.next();
+        this.tryEat(';');
+      }
+    }
+    return list;
+  }
+
+  stmt(vars) {
+    const t = this.peek();
+    if (!t) return null;
+    if (t === 'var')    return this.varDecl(vars);
+    if (t === 'repeat') return this.repeatStmt(vars);
+    if (t === 'while')  return this.whileStmt(vars);
+    if (t === 'if')     return this.ifStmt(vars);
+    if (/^[a-zA-Z_]/.test(t)) return this.identStmt(vars);
+    this.next();
+    return null;
+  }
+
+  varDecl(vars) {
+    this.eat('var');
+    const name = this.next();
+    this.eat('=');
+    const val = parseFloat(this.next()) || 0;
+    this.tryEat(';');
+    vars[name] = val;
+    return null; // variables live in vars dict, not as blocks
+  }
+
+  repeatStmt(vars) {
+    this.eat('repeat');
+    this.eat('(');
+    const n = parseInt(this.next()) || 1;
+    this.eat(')');
+    this.eat('{');
+    const body = this.stmtList(vars, '}');
+    this.eat('}');
+    return { id: nextId(), type: 'repeat', count: n, body };
+  }
+
+  whileStmt(vars) {
+    this.eat('while');
+    this.eat('(');
+    const cond = this.condition();
+    this.eat(')');
+    this.eat('{');
+    const body = this.stmtList(vars, '}');
+    this.eat('}');
+    return { id: nextId(), type: 'while_block', condition: cond, body };
+  }
+
+  ifStmt(vars) {
+    this.eat('if');
+    this.eat('(');
+    const cond = this.condition();
+    this.eat(')');
+    this.eat('{');
+    const body = this.stmtList(vars, '}');
+    this.eat('}');
+    return { id: nextId(), type: 'if_block', condition: cond, body };
+  }
+
+  condition() {
+    const opMap = { '<': 'var_lt', '<=': 'var_lte', '>': 'var_gt', '>=': 'var_gte', '==': 'var_eq' };
+    if (this.peek() === '!') {
+      this.next();
+      const id = this.next();
+      return id === 'loaded' ? { type: 'not_loaded' } : { type: 'always' };
+    }
+    const id = this.next();
+    if (id === 'loaded') return { type: 'loaded' };
+    if (id === 'true' || id === 'always') return { type: 'always' };
+    const op = this.peek();
+    if (op && opMap[op]) {
+      this.next();
+      const val = parseFloat(this.next()) || 0;
+      return { type: opMap[op], varName: id, value: val };
+    }
+    return { type: 'always' };
+  }
+
+  identStmt(vars) {
+    const id = this.next();
+    // Function call: move(), left(), etc.
+    if (this.peek() === '(') {
+      this.eat('(');
+      this.eat(')');
+      this.tryEat(';');
+      return this.actionToBlock(id);
+    }
+    // x++ / x--
+    if (this.peek() === '++') { this.next(); this.tryEat(';'); return { id: nextId(), type: 'change_var', varName: id, delta:  1 }; }
+    if (this.peek() === '--') { this.next(); this.tryEat(';'); return { id: nextId(), type: 'change_var', varName: id, delta: -1 }; }
+    // x += n / x -= n
+    if (this.peek() === '+=') { this.next(); const v=parseFloat(this.next())||0; this.tryEat(';'); return { id: nextId(), type: 'change_var', varName: id, delta:  v }; }
+    if (this.peek() === '-=') { this.next(); const v=parseFloat(this.next())||0; this.tryEat(';'); return { id: nextId(), type: 'change_var', varName: id, delta: -v }; }
+    // x = n
+    if (this.peek() === '=')  { this.next(); const v=parseFloat(this.next())||0; this.tryEat(';'); return { id: nextId(), type: 'set_var',    varName: id, value: v  }; }
+    this.tryEat(';');
+    return null;
+  }
+
+  actionToBlock(name) {
+    const map = {
+      move: 'move', forward: 'move',
+      left: 'rotate_left',  rotateLeft:  'rotate_left',  turnLeft:  'rotate_left',
+      right: 'rotate_right', rotateRight: 'rotate_right', turnRight: 'rotate_right',
+      load: 'load', reload: 'load',
+      shoot: 'shoot', fire: 'shoot',
+      wait: 'wait', skip: 'wait',
+    };
+    const type = map[name];
+    return type ? { id: nextId(), type } : null;
+  }
+}
+
+/** Parse a code string → { variables, blocks, error } */
+function parseCode(code) {
+  try {
+    const result = new ProgParser(code).parse();
+    return { ...result, error: null };
+  } catch (e) {
+    return { variables: {}, blocks: [], error: e.message };
+  }
+}
+
+/** Convert a block program back into the text mini-language */
+function blocksToCode(program) {
+  const vars   = program.variables || {};
+  const blocks = program.blocks    || [];
+  const lines  = [];
+
+  // Variable declarations at the top
+  const varEntries = Object.entries(vars);
+  if (varEntries.length) {
+    for (const [name, val] of varEntries) lines.push(`var ${name} = ${val};`);
+    lines.push('');
+  }
+
+  _blocksToLines(blocks, lines, 0);
+  return lines.join('\n');
+}
+
+function _blocksToLines(blocks, lines, depth) {
+  const pad = '  '.repeat(depth);
+  for (const b of blocks) {
+    switch (b.type) {
+      case 'move':         lines.push(pad + 'move();');  break;
+      case 'rotate_left':  lines.push(pad + 'left();');  break;
+      case 'rotate_right': lines.push(pad + 'right();'); break;
+      case 'load':         lines.push(pad + 'load();');  break;
+      case 'shoot':        lines.push(pad + 'shoot();'); break;
+      case 'wait':         lines.push(pad + 'wait();');  break;
+
+      case 'repeat':
+        lines.push(pad + `repeat(${b.count ?? 1}) {`);
+        _blocksToLines(b.body || [], lines, depth + 1);
+        lines.push(pad + '}');
+        break;
+
+      case 'while_block':
+        lines.push(pad + `while (${_condToCode(b.condition)}) {`);
+        _blocksToLines(b.body || [], lines, depth + 1);
+        lines.push(pad + '}');
+        break;
+
+      case 'if_block':
+        lines.push(pad + `if (${_condToCode(b.condition)}) {`);
+        _blocksToLines(b.body || [], lines, depth + 1);
+        lines.push(pad + '}');
+        break;
+
+      case 'set_var':
+        lines.push(pad + `${b.varName} = ${b.value ?? 0};`);
+        break;
+
+      case 'change_var': {
+        const d = b.delta ?? 1;
+        if      (d ===  1) lines.push(pad + `${b.varName}++;`);
+        else if (d === -1) lines.push(pad + `${b.varName}--;`);
+        else if (d  >  0)  lines.push(pad + `${b.varName} += ${d};`);
+        else               lines.push(pad + `${b.varName} -= ${Math.abs(d)};`);
+        break;
+      }
+    }
+  }
+}
+
+function _condToCode(cond) {
+  if (!cond) return 'true';
+  switch (cond.type) {
+    case 'loaded':     return 'loaded';
+    case 'not_loaded': return '!loaded';
+    case 'var_lt':     return `${cond.varName} < ${cond.value}`;
+    case 'var_lte':    return `${cond.varName} <= ${cond.value}`;
+    case 'var_gt':     return `${cond.varName} > ${cond.value}`;
+    case 'var_gte':    return `${cond.varName} >= ${cond.value}`;
+    case 'var_eq':     return `${cond.varName} == ${cond.value}`;
+    default:           return 'true';
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+//  COMMANDS TAB — BLOCK EDITOR
+// ═══════════════════════════════════════════════════════
+
+function initCommandsTab() {
+  // Build team tabs bar
+  document.getElementById('team-tabs-bar').innerHTML = TEAMS.map((t,i)=>`
+    <button class="team-tab" data-team="${i}"
+      style="border-color:transparent; color:var(--sub);">
+      ${t.name}
+    </button>
+  `).join('');
+  document.querySelectorAll('.team-tab').forEach(btn => {
+    btn.addEventListener('click', () => {
+      app.activeTeam = parseInt(btn.dataset.team);
+      app.heldBlock = null;
+      renderBlockEditor();
+    });
+  });
+
+  // View toggle — use event delegation since the toggle is re-rendered each time
+  document.getElementById('view-toggle-wrap').addEventListener('click', e => {
+    const btn = e.target.closest('.vt-btn');
+    if (!btn) return;
+    const view = btn.dataset.view;
+    if (view && view !== app.viewMode) {
+      app.viewMode = view;
+      renderBlockEditor();
+    }
+  });
+
+  renderBlockEditor();
+}
+
+function renderBlockEditor() {
+  // Update team tab styles
+  document.querySelectorAll('.team-tab').forEach((btn,i) => {
+    const active = i === app.activeTeam;
+    const team   = TEAMS[i];
+    btn.style.borderColor = active ? team.color : 'transparent';
+    btn.style.color       = active ? team.color : '';
+    btn.style.background  = active ? team.color+'18' : '';
+  });
+
+  // Render view toggle
+  const vtWrap = document.getElementById('view-toggle-wrap');
+  if (vtWrap) {
+    vtWrap.innerHTML = `
+      <div class="view-toggle">
+        <button class="vt-btn${app.viewMode==='blocks'?' active':''}" data-view="blocks">🧩 Blocks</button>
+        <button class="vt-btn${app.viewMode==='code'?' active':''}" data-view="code">📝 Code</button>
+      </div>`;
+  }
+
+  const blockEditorEl   = document.getElementById('block-editor');
+  const codeEditorWrap  = document.getElementById('code-editor-wrap');
+
+  if (app.viewMode === 'code') {
+    if (blockEditorEl)  blockEditorEl.style.display  = 'none';
+    if (codeEditorWrap) codeEditorWrap.style.display = 'flex';
+    codeEditorWrap.style.flexDirection = 'column';
+    // Auto-generate code from blocks if the textarea is empty but there are blocks
+    const tid = app.activeTeam;
+    const prog = app.programs[tid];
+    const hasBlocks = (prog.blocks || []).length > 0 || Object.keys(prog.variables || {}).length > 0;
+    if (hasBlocks && !app.teamCode[tid]) {
+      app.teamCode[tid] = blocksToCode(prog);
+    }
+    renderCodeEditor(app.activeTeam);
+  } else {
+    if (blockEditorEl)  blockEditorEl.style.display  = 'grid';
+    if (codeEditorWrap) codeEditorWrap.style.display = 'none';
+    renderPalette();
+    renderProgram();
+  }
+}
+
+/* ── Code Editor ── */
+const TEAM_FILENAMES = ['red.js', 'blue.js', 'green.js', 'yellow.js'];
+
+function renderCodeEditor(tid) {
+  const wrap  = document.getElementById('code-editor-wrap');
+  if (!wrap) return;
+  const team  = TEAMS[tid];
+  const fname = TEAM_FILENAMES[tid];
+  const code  = app.teamCode[tid];
+
+  wrap.innerHTML = `
+    <div class="code-editor-layout">
+      <div class="code-left">
+        <div class="code-editor-card">
+          <div class="code-editor-header">
+            <span class="code-filename" style="color:${team.color}">📄 ${fname}</span>
+            <div class="code-toolbar">
+              <button class="code-btn-load" id="code-convert-btn" title="Re-generate code from your current block program">🔄 From Blocks</button>
+              <label class="code-btn-load" title="Load a local .js file">
+                📂 Load file
+                <input type="file" accept=".js,.txt" id="code-file-input" style="display:none">
+              </label>
+              <button class="code-btn-load" id="code-copy-btn" title="Copy code to clipboard">📋 Copy</button>
+              <button class="code-btn-apply" id="code-apply-btn">✅ Apply to Bot</button>
+            </div>
+          </div>
+          <textarea class="code-textarea" id="code-textarea" spellcheck="false"
+            placeholder="// Write your bot's program here…">${escHtml(code)}</textarea>
+          <div class="code-status" id="code-status"></div>
+        </div>
+      </div>
+      <div class="code-ref-card">
+        <div class="ref-section">
+          <div class="ref-title">Commands</div>
+          <div class="ref-row"><span class="ref-code">move()</span><span class="ref-desc">move forward 1 tile</span></div>
+          <div class="ref-row"><span class="ref-code">left()</span><span class="ref-desc">rotate 90° left</span></div>
+          <div class="ref-row"><span class="ref-code">right()</span><span class="ref-desc">rotate 90° right</span></div>
+          <div class="ref-row"><span class="ref-code">load()</span><span class="ref-desc">load a paintball</span></div>
+          <div class="ref-row"><span class="ref-code">shoot()</span><span class="ref-desc">fire (must load first)</span></div>
+          <div class="ref-row"><span class="ref-code">wait()</span><span class="ref-desc">do nothing this turn</span></div>
+        </div>
+        <div class="ref-section">
+          <div class="ref-title">Control Flow</div>
+          <div class="ref-row"><span class="ref-code">repeat(n) {}</span><span class="ref-desc">repeat n times</span></div>
+          <div class="ref-row"><span class="ref-code">while (cond) {}</span><span class="ref-desc">loop while true</span></div>
+          <div class="ref-row"><span class="ref-code">if (cond) {}</span><span class="ref-desc">run if true</span></div>
+        </div>
+        <div class="ref-section">
+          <div class="ref-title">Conditions</div>
+          <div class="ref-row"><span class="ref-code">loaded</span><span class="ref-desc">bot is loaded</span></div>
+          <div class="ref-row"><span class="ref-code">!loaded</span><span class="ref-desc">bot is NOT loaded</span></div>
+          <div class="ref-row"><span class="ref-code">x &lt; 5</span><span class="ref-desc">variable comparison</span></div>
+          <div class="ref-row"><span class="ref-code">x &gt; 0</span><span class="ref-desc">variable comparison</span></div>
+          <div class="ref-row"><span class="ref-code">x == 3</span><span class="ref-desc">variable equality</span></div>
+        </div>
+        <div class="ref-section">
+          <div class="ref-title">Variables</div>
+          <div class="ref-row"><span class="ref-code">var x = 0;</span><span class="ref-desc">declare variable</span></div>
+          <div class="ref-row"><span class="ref-code">x++;</span><span class="ref-desc">add 1 to x</span></div>
+          <div class="ref-row"><span class="ref-code">x--;</span><span class="ref-desc">subtract 1 from x</span></div>
+          <div class="ref-row"><span class="ref-code">x += 3;</span><span class="ref-desc">add 3 to x</span></div>
+          <div class="ref-row"><span class="ref-code">x = 10;</span><span class="ref-desc">set x to 10</span></div>
+        </div>
+        <div class="ref-section">
+          <div class="ref-title">💡 Tip</div>
+          <div style="color:var(--sub);font-size:11px;line-height:1.5">
+            Load 4× in a row without shooting to trigger a <strong style="color:#f59e0b">BURST</strong> — paints a big diamond around your bot!
+          </div>
+        </div>
+      </div>
+    </div>`;
+
+  // Save textarea changes live
+  document.getElementById('code-textarea').addEventListener('input', e => {
+    app.teamCode[tid] = e.target.value;
+  });
+
+  // "From Blocks" — convert current block program to code
+  document.getElementById('code-convert-btn').addEventListener('click', () => {
+    const prog = app.programs[tid];
+    const generated = blocksToCode(prog);
+    if (!generated.trim()) {
+      showCodeStatus('err', '⚠ No blocks found — build a program in the Blocks view first.');
+      return;
+    }
+    app.teamCode[tid] = generated;
+    document.getElementById('code-textarea').value = generated;
+    showCodeStatus('ok', `✓ Converted ${countBlocks(prog.blocks || [])} block${countBlocks(prog.blocks||[])!==1?'s':''} → code. Edit and commit to ${TEAM_FILENAMES[tid]}!`);
+  });
+
+  // Copy to clipboard
+  document.getElementById('code-copy-btn').addEventListener('click', () => {
+    const code = document.getElementById('code-textarea').value;
+    if (!code.trim()) { showCodeStatus('err', '⚠ Nothing to copy yet.'); return; }
+    navigator.clipboard.writeText(code).then(
+      ()  => showCodeStatus('ok', '✓ Copied to clipboard!'),
+      ()  => showCodeStatus('err', '⚠ Copy failed — select all and copy manually (Ctrl/Cmd+A, Ctrl/Cmd+C).')
+    );
+  });
+
+  // Load from file button
+  document.getElementById('code-file-input').addEventListener('change', e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      const code = ev.target.result;
+      app.teamCode[tid] = code;
+      document.getElementById('code-textarea').value = code;
+      showCodeStatus('ok', `Loaded ${file.name}`);
+    };
+    reader.readAsText(file);
+  });
+
+  // Apply code → parse into blocks
+  document.getElementById('code-apply-btn').addEventListener('click', () => {
+    const code   = document.getElementById('code-textarea').value;
+    app.teamCode[tid] = code;
+    const result = parseCode(code);
+    if (result.error) {
+      showCodeStatus('err', '⚠ Parse error: ' + result.error);
+    } else {
+      // Tag all block arrays so they can be found by ID
+      tagAllArrays(result.blocks);
+      app.programs[tid] = { blocks: result.blocks, variables: result.variables };
+      const blockCount = countBlocks(result.blocks);
+      showCodeStatus('ok', `✓ Applied — ${blockCount} action${blockCount!==1?'s':''} · ${Object.keys(result.variables).length} variable${Object.keys(result.variables).length!==1?'s':''}`);
+    }
+  });
+}
+
+function escHtml(str) {
+  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function showCodeStatus(type, msg) {
+  const el = document.getElementById('code-status');
+  if (!el) return;
+  el.className = 'code-status ' + type;
+  el.textContent = msg;
+  if (type === 'ok') setTimeout(() => { if (el) el.className = 'code-status'; }, 3000);
+}
+
+function countBlocks(blocks) {
+  let n = 0;
+  for (const b of blocks) {
+    n++;
+    if (b.body) n += countBlocks(b.body);
+  }
+  return n;
+}
+
+/* ── Palette ── */
+function renderPalette() {
+  const panel  = document.getElementById('palette-panel');
+  const tid    = app.activeTeam;
+  const hasVars = getVars(tid).length > 0;
+  let html = '';
+  for (const grp of PALETTE_GROUPS) {
+    html += `<div class="palette-cat-label">${grp.label}</div>`;
+    for (const type of grp.types) {
+      const def  = BLOCK_DEFS[type];
+      const isData = def.cat === 'data';
+      const dis  = isData && !hasVars;
+      const held = app.heldBlock === type;
+      html += `<button class="pal-block ${def.cat}${held?' held':''}"
+        data-ptype="${type}" ${dis?'disabled title="Add a variable first"':''}>
+        ${def.icon} ${def.label}
+      </button>`;
+    }
+  }
+  panel.innerHTML = html;
+  panel.querySelectorAll('.pal-block:not(:disabled)').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const type = btn.dataset.ptype;
+      app.heldBlock = app.heldBlock === type ? null : type;
+      renderBlockEditor();
+    });
+  });
+}
+
+/* ── Program panel ── */
+function renderProgram() {
+  const panel = document.getElementById('program-panel');
+  const tid   = app.activeTeam;
+  const prog  = app.programs[tid];
+  const team  = TEAMS[tid];
+  const armed = !!app.heldBlock;
+
+  tagAllArrays(prog.blocks);
+
+  const hint = armed
+    ? `Click a <b>+</b> slot to place the <b>${BLOCK_DEFS[app.heldBlock].label}</b> block`
+    : 'Click a block in the palette to select it, then click a <b>+</b> slot';
+
+  let html = `
+    <div class="prog-header">
+      <div class="prog-title" style="color:${team.color};">${team.name} Bot</div>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <div class="prog-hint">${hint}</div>
+        <button class="prog-clear-btn" id="prog-clear">Clear all</button>
+      </div>
+    </div>
+  `;
+
+  // Variables strip
+  html += renderVarsStrip(tid);
+
+  // Block stack
+  html += `<div class="prog-stack">`;
+  html += dzHtml(prog.blocks._id, 0, armed);
+  for (let i=0; i<prog.blocks.length; i++) {
+    html += blockHtml(prog.blocks[i], tid, armed);
+    html += dzHtml(prog.blocks._id, i+1, armed);
+  }
+  if (prog.blocks.length === 0) {
+    html += `<div class="prog-empty">No blocks yet.<br>Pick a block from the palette →</div>`;
+  }
+  html += `</div>`;
+
+  panel.innerHTML = html;
+
+  // Attach events
+  panel.querySelector('#prog-clear').addEventListener('click', () => {
+    app.programs[app.activeTeam].blocks = [];
+    app.heldBlock = null;
+    renderBlockEditor();
+  });
+
+  // Drop zones
+  panel.querySelectorAll('.drop-zone').forEach(dz => {
+    dz.addEventListener('click', () => {
+      const arrId = dz.dataset.arrId;
+      const idx   = parseInt(dz.dataset.idx);
+      const arr   = app.arrayMap.get(arrId);
+      if (!arr) return;
+      if (app.heldBlock) {
+        arr.splice(idx, 0, makeBlock(app.heldBlock, tid));
+        app.heldBlock = null;
+        renderBlockEditor();
+      }
+    });
+  });
+
+  // Delete buttons
+  panel.querySelectorAll('[data-del-id]').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      removeBlock(app.programs[tid].blocks, btn.dataset.delId);
+      renderBlockEditor();
+    });
+  });
+
+  // Inline input / select changes
+  panel.querySelectorAll('[data-bid]').forEach(el => {
+    const update = () => applyBlockProp(el, tid);
+    el.addEventListener('change', update);
+    if (el.tagName==='INPUT') el.addEventListener('input', update);
+    el.addEventListener('click', e => e.stopPropagation());
+  });
+
+  // Variables
+  panel.querySelectorAll('[data-vdel]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      delete app.programs[tid].variables[btn.dataset.vdel];
+      renderBlockEditor();
+    });
+  });
+  panel.querySelectorAll('[data-vval]').forEach(inp => {
+    inp.addEventListener('change', () => {
+      app.programs[tid].variables[inp.dataset.vval] = parseInt(inp.value)||0;
+    });
+    inp.addEventListener('click', e => e.stopPropagation());
+  });
+  const addVarBtn = panel.querySelector('#add-var-btn');
+  if (addVarBtn) {
+    addVarBtn.addEventListener('click', () => {
+      const defaults = ['counter','x','y','steps','n','i','j'];
+      const used = getVars(tid);
+      const suggest = defaults.find(d=>!used.includes(d)) || `var${used.length+1}`;
+      const name = prompt('Variable name:', suggest);
+      if (!name) return;
+      if (!/^[a-zA-Z_]\w*$/.test(name)) { alert('Invalid name (letters, digits, underscore)'); return; }
+      if (used.includes(name)) { alert('Variable already exists'); return; }
+      app.programs[tid].variables[name] = 0;
+      renderBlockEditor();
+    });
+  }
+}
+
+function renderVarsStrip(tid) {
+  const vars = app.programs[tid].variables;
+  const entries = Object.entries(vars);
+  return `
+    <div class="vars-strip">
+      <span class="vars-strip-label">Vars</span>
+      ${entries.map(([name,val]) => `
+        <div class="var-chip">
+          <span class="var-chip-name">${name}</span>
+          <span class="var-chip-sep">= </span>
+          <input class="var-chip-val" type="number" value="${val}" data-vval="${name}">
+          <button class="var-chip-del" data-vdel="${name}" title="Remove">×</button>
+        </div>
+      `).join('')}
+      ${entries.length < 6
+        ? `<button class="add-var-btn" id="add-var-btn">+ New variable</button>`
+        : ''}
+    </div>
+  `;
+}
+
+function dzHtml(arrId, idx, armed) {
+  return `<div class="drop-zone${armed?' armed':''}" data-arr-id="${arrId}" data-idx="${idx}">
+    <span class="dz-label">+</span>
+  </div>`;
+}
+
+function blockHtml(block, tid, armed) {
+  const def  = BLOCK_DEFS[block.type];
+  if (!def) return '';
+  const vars = getVars(tid);
+  const del  = `<button class="prog-del" data-del-id="${block.id}" title="Remove">×</button>`;
+
+  let inner = '';
+  switch (block.type) {
+    case 'move': case 'rotate_left': case 'rotate_right': case 'load': case 'shoot': case 'wait':
+      inner = `${def.icon} ${def.label} ${del}`;
+      break;
+
+    case 'repeat':
+      inner = `${def.icon} Repeat
+        <input type="number" data-bid="${block.id}" data-prop="count"
+          value="${block.count||3}" min="1" max="9999" style="width:52px">
+        times ${del}`;
+      break;
+
+    case 'while_block':
+    case 'if_block': {
+      const cond    = block.condition || { type:'always' };
+      const condDef = CONDITIONS.find(c=>c.id===cond.type)||CONDITIONS[0];
+      const kw      = block.type==='while_block' ? 'While' : 'If';
+      inner = `${def.icon} ${kw}
+        <select data-bid="${block.id}" data-prop="cond-type">
+          ${CONDITIONS.map(c=>`<option value="${c.id}" ${c.id===cond.type?'selected':''}>${c.label}</option>`).join('')}
+        </select>
+        ${condDef.hasVar ? `<select data-bid="${block.id}" data-prop="cond-var">
+          ${vars.map(v=>`<option value="${v}" ${v===cond.varName?'selected':''}>${v}</option>`).join('')}
+        </select>` : ''}
+        ${condDef.hasVal ? `<input type="number" data-bid="${block.id}" data-prop="cond-val"
+          value="${cond.value||0}" style="width:44px">` : ''}
+        ${del}`;
+      break;
+    }
+
+    case 'set_var':
+      inner = `${def.icon} Set
+        <select data-bid="${block.id}" data-prop="varName">
+          ${vars.map(v=>`<option value="${v}" ${v===block.varName?'selected':''}>${v}</option>`).join('')}
+        </select>
+        to
+        <input type="number" data-bid="${block.id}" data-prop="value"
+          value="${block.value||0}" style="width:52px">
+        ${del}`;
+      break;
+
+    case 'change_var':
+      inner = `${def.icon} Change
+        <select data-bid="${block.id}" data-prop="varName">
+          ${vars.map(v=>`<option value="${v}" ${v===block.varName?'selected':''}>${v}</option>`).join('')}
+        </select>
+        by
+        <input type="number" data-bid="${block.id}" data-prop="delta"
+          value="${block.delta||1}" style="width:52px">
+        ${del}`;
+      break;
+  }
+
+  if (def.hasBody) {
+    tagAllArrays(block.body);
+    const bid = block.body._id;
+    return `
+      <div class="c-block">
+        <div class="prog-block control">${inner}</div>
+        <div class="c-body">
+          ${dzHtml(bid, 0, armed)}
+          ${block.body.map((b,i) => blockHtml(b, tid, armed) + dzHtml(bid, i+1, armed)).join('')}
+          ${block.body.length===0 ? `<div style="font-size:11px;color:rgba(255,255,255,0.3);padding:4px 0;">empty — add blocks here</div>` : ''}
+        </div>
+        <div class="c-cap"></div>
+      </div>`;
+  }
+
+  return `<div class="prog-block ${def.cat}">${inner}</div>`;
+}
+
+function applyBlockProp(el, tid) {
+  const block = findBlock(app.programs[tid].blocks, el.dataset.bid);
+  if (!block) return;
+  const prop = el.dataset.prop;
+  const val  = el.value;
+  switch (prop) {
+    case 'count':    block.count    = parseInt(val)||1; break;
+    case 'varName':  block.varName  = val;              break;
+    case 'value':    block.value    = parseInt(val)||0; break;
+    case 'delta':    block.delta    = parseInt(val)||0; break;
+    case 'cond-type':
+      if (!block.condition) block.condition = {};
+      block.condition.type = val;
+      renderBlockEditor(); // re-render to show/hide var+val inputs
+      break;
+    case 'cond-var':
+      if (!block.condition) block.condition = {};
+      block.condition.varName = val;
+      break;
+    case 'cond-val':
+      if (!block.condition) block.condition = {};
+      block.condition.value = parseInt(val)||0;
+      break;
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+//  SIMULATION TAB
+// ═══════════════════════════════════════════════════════
+
+function sizeCanvas() {
+  const wrap   = document.getElementById('canvas-wrap');
+  const avail  = Math.min(wrap.clientWidth - 32, 660);
+  const canvas = document.getElementById('game-canvas');
+  canvas.width = canvas.height = avail;
+}
+
+function renderSim() {
+  if (!app.states.length) return;
+  const state  = app.states[app.currentTurn];
+  const gs     = app.gridSize;
+  renderCanvas(document.getElementById('game-canvas'), state, gs, app.terrain);
+
+  document.getElementById('cur-turn').textContent = app.currentTurn;
+  document.getElementById('tot-turns').textContent = app.numTurns;
+
+  // Scores
+  const scores  = computeScores(state.grid);
+  const walls   = app.terrain
+    ? app.terrain.flat().filter(c=>c===T_WALL).length : 0;
+  const total   = gs * gs - walls;
+  const painted = scores.reduce((a,b)=>a+b,0);
+  document.getElementById('total-tiles').textContent   = total;
+  document.getElementById('painted-tiles').textContent = painted;
+  document.getElementById('score-rows').innerHTML = TEAMS.map((t,i) => `
+    <div class="score-row">
+      <div class="score-swatch" style="background:${t.color};"></div>
+      <span class="score-team-name" style="color:${t.color};">${t.name}</span>
+      <div class="score-bar-track">
+        <div class="score-bar-fill" style="background:${t.color}; width:${(scores[i]/total*100).toFixed(1)}%;"></div>
+      </div>
+      <span class="score-tile-count" style="color:${t.color};">${scores[i]}</span>
+    </div>
+  `).join('');
+
+  // This Turn
+  const evts = state.events || [];
+  document.getElementById('turn-commands').innerHTML = TEAMS.map((t,i) => {
+    const teamEvts = evts.filter(e => e.teamId===i);
+    const text = app.currentTurn===0 ? '—' : (teamEvts.length ? teamEvts[0].text : 'Wait');
+    return `<div class="turn-cmd-item">
+      <div class="turn-cmd-dot" style="background:${t.color};"></div>
+      <span class="turn-cmd-team" style="color:${t.color};">${t.name}</span>
+      <span class="turn-cmd-action">${text}</span>
+    </div>`;
+  }).join('');
+
+  // Event log
+  document.getElementById('event-log').innerHTML = evts.length
+    ? evts.map(e => `<div class="event-item">
+        <div class="event-dot" style="background:${TEAMS[e.teamId].color};"></div>
+        <span><strong style="color:${TEAMS[e.teamId].color}">${TEAMS[e.teamId].name}</strong>: ${e.text}</span>
+      </div>`).join('')
+    : '<div class="empty-state">No events this turn</div>';
+
+  // Winner banner
+  const banner = document.getElementById('winner-banner');
+  if (app.currentTurn === app.numTurns) {
+    const max     = Math.max(...scores);
+    const winners = TEAMS.filter((_,i) => scores[i]===max);
+    if (winners.length===1) {
+      const w = winners[0];
+      banner.style.cssText = `display:block;background:${w.color}33;color:${w.color};border:2px solid ${w.color};`;
+      banner.textContent = `🏆 ${w.name} wins with ${max} tiles!`;
+    } else {
+      banner.style.cssText = `display:block;background:#33334455;color:#e2e8f0;border:2px solid #334155;`;
+      banner.textContent = `🤝 Tie! ${winners.map(w=>w.name).join(' & ')} with ${max} tiles`;
+    }
+  } else {
+    banner.style.display = 'none';
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+//  PLAYBACK
+// ═══════════════════════════════════════════════════════
+
+function playMs() { return Math.round(1200 / (+document.getElementById('speed-slider').value)); }
+
+function play() {
+  app.playing = true;
+  document.getElementById('btn-play').textContent = '⏸';
+  document.getElementById('btn-play').classList.add('accent');
+  tick();
+}
+function pause() {
+  app.playing = false;
+  clearTimeout(app.playTimer);
+  document.getElementById('btn-play').textContent = '▶';
+  document.getElementById('btn-play').classList.remove('accent');
+}
+function tick() {
+  if (app.currentTurn >= app.numTurns) { pause(); return; }
+  app.currentTurn++;
+  renderSim();
+  app.playTimer = setTimeout(tick, playMs());
+}
+
+// ═══════════════════════════════════════════════════════
+//  TAB NAVIGATION
+// ═══════════════════════════════════════════════════════
+
+function switchTab(id) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-'+id).classList.add('active');
+  document.querySelector(`.tab-btn[data-tab="${id}"]`).classList.add('active');
+  if (id==='simulation') setTimeout(() => { sizeCanvas(); renderSim(); }, 80);
+}
+
+// ═══════════════════════════════════════════════════════
+//  BOOTSTRAP
+// ═══════════════════════════════════════════════════════
+
+document.addEventListener('DOMContentLoaded', () => {
+  renderTeamsGrid();
+  renderPreview();
+
+  // Level card selection
+  document.getElementById('level-cards').addEventListener('click', e => {
+    const card = e.target.closest('.level-card');
+    if (!card) return;
+    app.level = parseInt(card.dataset.level);
+    document.querySelectorAll('.level-card').forEach(c => c.classList.remove('active'));
+    card.classList.add('active');
+    renderPreview();  // show terrain preview
+  });
+
+  // Setup sliders
+  document.getElementById('grid-size').addEventListener('input', e => {
+    app.gridSize = +e.target.value;
+    document.getElementById('grid-size-display').textContent = `${app.gridSize} × ${app.gridSize}`;
+    renderPreview();
+  });
+  document.getElementById('num-turns').addEventListener('input', e => {
+    app.numTurns = +e.target.value;
+    document.getElementById('num-turns-display').textContent = app.numTurns;
+  });
+
+  document.getElementById('setup-btn').addEventListener('click', () => {
+    app.programs = [{ blocks:[],variables:{} },{ blocks:[],variables:{} },{ blocks:[],variables:{} },{ blocks:[],variables:{} }];
+    app.activeTeam = 0; app.heldBlock = null; app.viewMode = 'blocks';
+    initCommandsTab();
+    switchTab('commands');
+  });
+
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const id = btn.dataset.tab;
+      if (id==='commands' && !document.getElementById('team-tabs-bar').innerHTML) initCommandsTab();
+      switchTab(id);
+    });
+  });
+
+  document.getElementById('simulate-btn').addEventListener('click', () => {
+    pause();
+    app.terrain = generateTerrain(app.gridSize, app.level);
+    app.states  = runSimulation(app.gridSize, app.numTurns, app.programs, app.terrain);
+    app.currentTurn = 0;
+    switchTab('simulation');
+    setTimeout(() => { sizeCanvas(); renderSim(); }, 120);
+  });
+
+  // Playback controls
+  document.getElementById('btn-first').addEventListener('click', () => { pause(); app.currentTurn=0; renderSim(); });
+  document.getElementById('btn-prev').addEventListener('click',  () => { pause(); if(app.currentTurn>0){ app.currentTurn--; renderSim(); } });
+  document.getElementById('btn-play').addEventListener('click',  () => {
+    if (app.playing) pause();
+    else { if(app.currentTurn>=app.numTurns) app.currentTurn=0; play(); }
+  });
+  document.getElementById('btn-next').addEventListener('click',  () => { pause(); if(app.currentTurn<app.numTurns){ app.currentTurn++; renderSim(); } });
+  document.getElementById('btn-last').addEventListener('click',  () => { pause(); app.currentTurn=app.numTurns; renderSim(); });
+
+  document.getElementById('speed-slider').addEventListener('input', e => {
+    document.getElementById('speed-val').textContent = e.target.value + '×';
+  });
+
+  // Keyboard shortcuts
+  document.addEventListener('keydown', e => {
+    if (!document.getElementById('tab-simulation').classList.contains('active')) return;
+    if (e.key==='ArrowLeft')  { pause(); if(app.currentTurn>0){app.currentTurn--;renderSim();} }
+    if (e.key==='ArrowRight') { pause(); if(app.currentTurn<app.numTurns){app.currentTurn++;renderSim();} }
+    if (e.key===' ')          { e.preventDefault(); app.playing?pause():(app.currentTurn>=app.numTurns?(app.currentTurn=0,play()):play()); }
+  });
+
+  window.addEventListener('resize', () => {
+    if (document.getElementById('tab-simulation').classList.contains('active')) { sizeCanvas(); renderSim(); }
+    renderPreview();
+  });
+});
+</script>
+</body>
+</html>
